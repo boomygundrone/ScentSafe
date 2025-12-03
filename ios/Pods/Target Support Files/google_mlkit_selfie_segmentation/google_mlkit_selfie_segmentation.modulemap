@@ -1,0 +1,6 @@
+framework module google_mlkit_selfie_segmentation {
+  umbrella header "google_mlkit_selfie_segmentation-umbrella.h"
+
+  export *
+  module * { export * }
+}

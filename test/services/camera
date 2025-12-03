@@ -1,0 +1,116 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:scentsafe/services/camera_service.dart';
+import 'package:scentsafe/errors/app_exceptions.dart';
+
+void main() {
+  group('CameraService', () {
+    late CameraService cameraService;
+
+    setUp(() {
+      cameraService = CameraService();
+    });
+
+    group('Initialization', () {
+      test('singleton pattern works correctly', () {
+        final service1 = CameraService.instance;
+        final service2 = CameraService.instance;
+        
+        expect(identical(service1, service2), true);
+      });
+
+      test('initial state is correct', () {
+        expect(cameraService.isInitialized, false);
+        expect(cameraService.controller, isNull);
+        expect(cameraService.isDisposed, true);
+      });
+    });
+
+    group('Camera Controller Lifecycle', () {
+      test('disposeCamera handles cleanup correctly', () async {
+        // Simulate disposal
+        await cameraService.disposeCamera();
+        expect(cameraService.isInitialized, false);
+        expect(cameraService.controller, isNull);
+      });
+
+      test('double dispose does not cause errors', () async {
+        await cameraService.disposeCamera();
+        await cameraService.disposeCamera(); // Should not throw
+        expect(cameraService.isInitialized, false);
+      });
+    });
+
+    group('State Management', () {
+      test('cameraStateStream is available', () {
+        final stream = cameraService.cameraStateStream;
+        expect(stream, isA<Stream<CameraState>>());
+      });
+    });
+
+    group('Error Handling', () {
+      test('disposed service handles operations gracefully', () async {
+        cameraService.dispose();
+        expect(cameraService.isDisposed, true);
+        
+        // Operations on disposed service should be safe
+        final widget = cameraService.buildPreview();
+        expect(widget, isA<Container>());
+      });
+    });
+
+    group('UI Components', () {
+      test('buildPreview returns widget', () {
+        final widget = cameraService.buildPreview();
+        expect(widget, isA<Container>());
+      });
+    });
+
+    group('Resource Management', () {
+      test('service disposes all resources correctly', () async {
+        cameraService.dispose();
+        
+        expect(cameraService.isDisposed, true);
+        expect(cameraService.isInitialized, false);
+        expect(cameraService.controller, isNull);
+      });
+    });
+  });
+
+  group('CameraState', () {
+    test('states are created correctly', () {
+      final discovered = CameraState.discovered();
+      expect(discovered.type, CameraStateType.discovered);
+      expect(discovered.errorMessage, isNull);
+
+      final error = CameraState.error('Test error');
+      expect(error.type, CameraStateType.error);
+      expect(error.errorMessage, 'Test error');
+    });
+
+    test('equality works correctly', () {
+      final state1 = CameraState.discovered();
+      final state2 = CameraState.discovered();
+      final state3 = CameraState.error('Test');
+
+      expect(state1, equals(state2));
+      expect(state1, isNot(equals(state3)));
+    });
+
+    test('toString provides meaningful output', () {
+      final discovered = CameraState.discovered();
+      final error = CameraState.error('Test error');
+
+      expect(discovered.toString(), 'CameraState.discovered');
+      expect(error.toString(), 'CameraState.error: Test error');
+    });
+
+    test('hashCode is consistent', () {
+      final state1 = CameraState.discovered();
+      final state2 = CameraState.discovered();
+
+      expect(state1.hashCode, equals(state2.hashCode));
+    });
+  });
+}

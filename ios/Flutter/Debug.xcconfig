@@ -1,0 +1,5 @@
+#include "Generated.xcconfig"
+
+// This is a generated file; do not edit or check into version control.
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+#include "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"

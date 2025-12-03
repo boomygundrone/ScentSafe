@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "107509751098449448042",
+    "project_id": "scentsafe-17cfd",
+    "storage_bucket": "scentsafe-17cfd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:107509751098449448042:android:4a5b6c7d8e9f0a1b2c3d4e",
+        "android_client_info": {
+          "package_name": "com.example.scentsafe"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "107509751098449448042-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBqPg5jH8sLnSgqwT9iP2ZmGd2o4kV8a4U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "107509751098449448042-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,202 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:scentsafe/models/detection_result.dart';
+
+void main() {
+  group('DetectionResult', () {
+    test('creates valid detection result', () {
+      final timestamp = DateTime.now();
+      final result = DetectionResult(
+        level: DrowsinessLevel.alert,
+        confidence: 0.85,
+        timestamp: timestamp,
+        leftEAR: 0.25,
+        rightEAR: 0.27,
+        averageEAR: 0.26,
+        mar: 0.3,
+        headTilt: 15.0,
+        blinkCount: 10,
+        yawnCount: 2,
+        drowsinessScore: 20.0,
+        triggeredSpray: false,
+      );
+
+      expect(result.level, DrowsinessLevel.alert);
+      expect(result.confidence, 0.85);
+      expect(result.timestamp, timestamp);
+      expect(result.leftEAR, 0.25);
+      expect(result.rightEAR, 0.27);
+      expect(result.averageEAR, 0.26);
+      expect(result.mar, 0.3);
+      expect(result.headTilt, 15.0);
+      expect(result.blinkCount, 10);
+      expect(result.yawnCount, 2);
+      expect(result.drowsinessScore, 20.0);
+      expect(result.triggeredSpray, false);
+    });
+
+    test('serializes to JSON correctly', () {
+      final timestamp = DateTime.parse('2023-01-01T10:00:00Z');
+      final result = DetectionResult(
+        level: DrowsinessLevel.mildFatigue,
+        confidence: 0.75,
+        timestamp: timestamp,
+        triggeredSpray: true,
+      );
+
+      final json = result.toJson();
+      expect(json['level'], 1); // mildFatigue index
+      expect(json['confidence'], 0.75);
+      expect(json['timestamp'], '2023-01-01T10:00:00.000Z');
+      expect(json['triggeredSpray'], true);
+    });
+
+    test('deserializes from JSON correctly', () {
+      final json = {
+        'level': 2, // moderateFatigue
+        'confidence': 0.8,
+        'timestamp': '2023-01-01T10:00:00.000Z',
+        'averageEAR': 0.15,
+        'drowsinessScore': 65.0,
+        'triggeredSpray': true,
+      };
+
+      final result = DetectionResult.fromJson(json);
+      expect(result.level, DrowsinessLevel.moderateFatigue);
+      expect(result.confidence, 0.8);
+      expect(result.averageEAR, 0.15);
+      expect(result.drowsinessScore, 65.0);
+      expect(result.triggeredSpray, true);
+    });
+
+    test('round trip serialization works', () {
+      final original = DetectionResult(
+        level: DrowsinessLevel.severeFatigue,
+        confidence: 0.95,
+        timestamp: DateTime.now(),
+        leftEAR: 0.1,
+        rightEAR: 0.12,
+        averageEAR: 0.11,
+        mar: 0.6,
+        headTilt: 45.0,
+        blinkCount: 0,
+        yawnCount: 5,
+        drowsinessScore: 85.0,
+        triggeredSpray: true,
+      );
+
+      final json = original.toJson();
+      final reconstructed = DetectionResult.fromJson(json);
+
+      expect(reconstructed.level, original.level);
+      expect(reconstructed.confidence, original.confidence);
+      expect(reconstructed.leftEAR, original.leftEAR);
+      expect(reconstructed.rightEAR, original.rightEAR);
+      expect(reconstructed.averageEAR, original.averageEAR);
+      expect(reconstructed.mar, original.mar);
+      expect(reconstructed.headTilt, original.headTilt);
+      expect(reconstructed.blinkCount, original.blinkCount);
+      expect(reconstructed.yawnCount, original.yawnCount);
+      expect(reconstructed.drowsinessScore, original.drowsinessScore);
+      expect(reconstructed.triggeredSpray, original.triggeredSpray);
+    });
+
+    test('equality comparison works correctly', () {
+      final timestamp = DateTime.now();
+      final result1 = DetectionResult(
+        level: DrowsinessLevel.alert,
+        confidence: 0.8,
+        timestamp: timestamp,
+      );
+      
+      final result2 = DetectionResult(
+        level: DrowsinessLevel.alert,
+        confidence: 0.8,
+        timestamp: timestamp,
+      );
+      
+      final result3 = DetectionResult(
+        level: DrowsinessLevel.mildFatigue,
+        confidence: 0.8,
+        timestamp: timestamp,
+      );
+
+      expect(result1, equals(result2));
+      expect(result1, isNot(equals(result3)));
+    });
+
+    test('hashCode is consistent', () {
+      final timestamp = DateTime.now();
+      final result1 = DetectionResult(
+        level: DrowsinessLevel.alert,
+        confidence: 0.8,
+        timestamp: timestamp,
+      );
+      
+      final result2 = DetectionResult(
+        level: DrowsinessLevel.alert,
+        confidence: 0.8,
+        timestamp: timestamp,
+      );
+
+      expect(result1.hashCode, equals(result2.hashCode));
+    });
+
+    test('toString provides meaningful output', () {
+      final result = DetectionResult(
+        level: DrowsinessLevel.moderateFatigue,
+        confidence: 0.7,
+        timestamp: DateTime.parse('2023-01-01T10:00:00Z'),
+        averageEAR: 0.15,
+        mar: 0.4,
+        headTilt: 30.0,
+        blinkCount: 5,
+        yawnCount: 3,
+        drowsinessScore: 60.0,
+      );
+
+      final str = result.toString();
+      expect(str, contains('moderateFatigue'));
+      expect(str, contains('0.7'));
+      expect(str, contains('ear: 0.15'));
+      expect(str, contains('blinks: 5'));
+      expect(str, contains('yawns: 3'));
+    });
+
+    test('legacy factory creates minimal result', () {
+      final timestamp = DateTime.now();
+      final result = DetectionResult.legacy(
+        level: DrowsinessLevel.alert,
+        confidence: 0.9,
+        timestamp: timestamp,
+      );
+
+      expect(result.level, DrowsinessLevel.alert);
+      expect(result.confidence, 0.9);
+      expect(result.timestamp, timestamp);
+      expect(result.leftEAR, isNull);
+      expect(result.rightEAR, isNull);
+      expect(result.averageEAR, isNull);
+    });
+  });
+
+  group('DrowsinessLevel', () {
+    test('all levels are defined', () {
+      expect(DrowsinessLevel.alert, isNotNull);
+      expect(DrowsinessLevel.mildFatigue, isNotNull);
+      expect(DrowsinessLevel.moderateFatigue, isNotNull);
+      expect(DrowsinessLevel.severeFatigue, isNotNull);
+    });
+
+    test('levels are unique', () {
+      final levels = [
+        DrowsinessLevel.alert,
+        DrowsinessLevel.mildFatigue,
+        DrowsinessLevel.moderateFatigue,
+        DrowsinessLevel.severeFatigue,
+      ];
+
+      final uniqueLevels = levels.toSet();
+      expect(uniqueLevels.length, 4);
+    });
+  });
+}

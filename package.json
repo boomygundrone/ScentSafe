@@ -1,0 +1,16 @@
+{
+  "name": "scentsafe-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for ScentSafe Flutter app using Playwright",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:codegen": "playwright codegen http://localhost:8080",
+    "test:e2e:install": "playwright install",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+    <base href="$FLUTTER_BASE_HREF" />
+
+    <meta charset="UTF-8" />
+    <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
+    <meta name="description" content="A new Flutter project." />
+
+    <!-- iOS meta tags & icons -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="scentsafe" />
+    <link rel="apple-touch-icon" href="icons/Icon-192.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <title>scentsafe</title>
+    <link rel="manifest" href="manifest.json" />
+
+    <!-- Face Detection Libraries for Web -->
+    <!-- MediaPipe Face Detection for high-performance web face detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+
+    <!-- Alternative: face-api.js for comprehensive face detection and landmark detection -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script> -->
+  </head>
+  <body>
+    <script src="flutter_bootstrap.js" async></script>
+
+    <!-- Initialize face detection for web -->
+    <script>
+      // Debug script loading
+      console.log("=== FACE DETECTION SCRIPT LOADING DEBUG ===");
+      console.log(
+        "Checking if MediaPipe FaceDetection is available:",
+        typeof FaceDetection
+      );
+
+      // This script will be used by the WebFaceDetectorService
+      // to initialize and configure web-based face detection
+      window.webFaceDetection = {
+        initialized: false,
+
+        // Initialize MediaPipe Face Detection
+        initialize: async function () {
+          try {
+            console.log("=== INITIALIZING WEB FACE DETECTION ===");
+            console.log("FaceDetection class available:", typeof FaceDetection);
+
+            if (typeof FaceDetection === "undefined") {
+              console.error(
+                "FaceDetection class not available - MediaPipe script not loaded"
+              );
+              return false;
+            }
+
+            // MediaPipe Face Detection configuration
+            const faceDetection = new FaceDetection({
+              locateFile: (file) => {
+                console.log("Loading MediaPipe file:", file);
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/${file}`;
+              },
+            });
+
+            faceDetection.setOptions({
+              model: "short",
+              minDetectionConfidence: 0.5,
+            });
+
+            this.faceDetection = faceDetection;
+            this.initialized = true;
+
+            console.log("✅ Web face detection initialized successfully");
+            console.log("Face detection object:", this.faceDetection);
+            return true;
+          } catch (error) {
+            console.error("❌ Failed to initialize web face detection:", error);
+            console.error("Error details:", error.stack);
+            return false;
+          }
+        },
+
+        // Process image for face detection
+        detectFaces: async function (imageElement) {
+          console.log("=== DETECTING FACES ===");
+          console.log("Initialized:", this.initialized);
+          console.log("Face detection object:", this.faceDetection);
+          console.log("Image element:", imageElement);
+
+          if (!this.initialized) {
+            console.error("Web face detection not initialized");
+            return null;
+          }
+
+          if (!imageElement) {
+            console.error("No image element provided");
+            return null;
+          }
+
+          try {
+            console.log(
+              "DIAGNOSTIC: About to call MediaPipe faceDetection.send()"
+            );
+
+            // MediaPipe Face Detection uses a different pattern - we need to set up event listeners
+            return new Promise((resolve, reject) => {
+              // Set a timeout to avoid hanging
+              const timeout = setTimeout(() => {
+                console.error(
+                  "DIAGNOSTIC: Face detection timeout after 10 seconds"
+                );
+                reject(new Error("Face detection timeout"));
+              }, 10000);
+
+              // Set up event listener for results
+              this.faceDetection.onResults((results) => {
+                clearTimeout(timeout);
+                console.log(
+                  "DIAGNOSTIC: MediaPipe onResults callback:",
+                  results
+                );
+                console.log("DIAGNOSTIC: Results type:", typeof results);
+                console.log(
+                  "DIAGNOSTIC: Results.detections:",
+                  results?.detections
+                );
+
+                if (
+                  results &&
+                  results.detections &&
+                  results.detections.length > 0
+                ) {
+                  console.log(
+                    "DIAGNOSTIC: Resolving with detections:",
+                    results.detections
+                  );
+                  // Convert detections to a more compatible format
+                  const formattedDetections = results.detections.map(
+                    (detection) => ({
+                      boundingBox: detection.boundingBox || {
+                        xMin: detection.boundingBox?.xMin || 0,
+                        yMin: detection.boundingBox?.yMin || 0,
+                        width: detection.boundingBox?.width || 0,
+                        height: detection.boundingBox?.height || 0,
+                      },
+                      confidence: detection.score || 0.5,
+                      landmarks: detection.landmarks || [],
+                    })
+                  );
+                  resolve(formattedDetections);
+                } else {
+                  console.log(
+                    "DIAGNOSTIC: No detections found, resolving with empty array"
+                  );
+                  resolve([]);
+                }
+              });
+
+              // Send the image for processing
+              this.faceDetection
+                .send({ image: imageElement })
+                .catch((error) => {
+                  clearTimeout(timeout);
+                  console.error("DIAGNOSTIC: MediaPipe send error:", error);
+                  reject(error);
+                });
+            });
+          } catch (error) {
+            console.error("Face detection error:", error);
+            console.error("Error details:", error.stack);
+            return null;
+          }
+        },
+      };
+
+      // Test initialization immediately
+      console.log("Testing immediate initialization...");
+      window.webFaceDetection.initialize().then((result) => {
+        console.log("Immediate initialization result:", result);
+      });
+
+      console.log("=== END FACE DETECTION SCRIPT LOADING DEBUG ===");
+    </script>
+  </body>
+</html>

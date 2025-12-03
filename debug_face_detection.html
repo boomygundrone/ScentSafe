@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Face Detection Debug</title>
+  </head>
+  <body>
+    <h1>Face Detection Debug</h1>
+    <button onclick="testFaceDetection()">Test Face Detection</button>
+    <div id="output"></div>
+
+    <script>
+      // Test if we can access the web face detection API
+      function testFaceDetection() {
+        console.log("=== TESTING FACE DETECTION ===");
+        console.log("window.webFaceDetection:", window.webFaceDetection);
+        console.log(
+          "typeof window.webFaceDetection:",
+          typeof window.webFaceDetection
+        );
+
+        if (window.webFaceDetection) {
+          console.log("✅ MediaPipe API is available");
+
+          // Try to initialize
+          window.webFaceDetection
+            .initialize()
+            .then((result) => {
+              console.log("MediaPipe initialization result:", result);
+
+              if (result) {
+                console.log("✅ MediaPipe initialized successfully");
+                document.getElementById("output").innerHTML =
+                  "✅ SUCCESS: MediaPipe face detection is working!";
+              } else {
+                console.log("❌ MediaPipe initialization failed");
+                document.getElementById("output").innerHTML =
+                  "❌ FAILED: MediaPipe initialization failed";
+              }
+            })
+            .catch((error) => {
+              console.log("❌ MediaPipe initialization error:", error);
+              document.getElementById("output").innerHTML =
+                "❌ ERROR: MediaPipe initialization error: " + error;
+            });
+        } else {
+          console.log("❌ MediaPipe API is not available");
+          document.getElementById("output").innerHTML =
+            "❌ FAILED: MediaPipe API not available";
+        }
+      }
+    </script>
+  </body>
+</html>

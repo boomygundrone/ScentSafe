@@ -1,0 +1,6 @@
+framework module google_mlkit_entity_extraction {
+  umbrella header "google_mlkit_entity_extraction-umbrella.h"
+
+  export *
+  module * { export * }
+}
