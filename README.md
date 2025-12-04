@@ -23,7 +23,7 @@ ScentSafe is an innovative Flutter application that uses AI-powered drowsiness d
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/boomygundrone/ScentSafe.git
 cd scentsafe
 ```
 
@@ -89,7 +89,7 @@ Use the convenience script to run E2E tests:
 # Run all tests
 ./run_e2e_tests.sh
 
-# Run with visible browser
+# Run with a visible browser
 ./run_e2e_tests.sh --headed
 
 # Run in debug mode
@@ -142,7 +142,7 @@ test/                         # Unit and widget tests
 The app follows a clean architecture pattern with:
 
 - **BLoC Pattern**: For state management using flutter_bloc
-- **Service Layer**: Separates business logic from UI
+- **Service Layer**: Separates business logic from the UI
 - **Repository Pattern**: For data access abstraction
 - **Dependency Injection**: For better testability
 
