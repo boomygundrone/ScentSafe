@@ -74,6 +74,8 @@ class _VideoScreenState extends State<VideoScreen> {
         throw Exception('Camera service not initialized');
       }
 
+      // Always initialize camera to ensure it's ready
+      // This handles both new initialization and re-initialization
       await _cameraService!.initializeCamera(resolution: ResolutionPreset.high);
 
       // Set camera controller in detection service
@@ -106,7 +108,9 @@ class _VideoScreenState extends State<VideoScreen> {
   }
 
   Future<void> _startDetection() async {
-    if (_cameraService == null || !_cameraService!.isInitialized) {
+    if (_cameraService == null ||
+        !_cameraService!.isInitialized ||
+        _cameraService!.controller == null) {
       // Initialize camera if not already initialized
       await _initializeCamera();
     }

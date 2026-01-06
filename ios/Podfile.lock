@@ -1793,7 +1793,7 @@ SPEC CHECKSUMS:
   FirebaseFirestore: 1e5fafdac2b2ef1ffc24034460b7b4821a15be96
   FirebaseFirestoreInternal: df9ab608a59a4e8eefd0796ed7652f3c1a88473a
   FirebaseSharedSwift: e17c654ef1f1a616b0b33054e663ad1035c8fd40
-  Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
   google_mlkit_barcode_scanning: 8f5987f244a43fe1167689c548342a5174108159
   google_mlkit_commons: 2abe6a70e1824e431d16a51085cb475b672c8aab

@@ -70,6 +70,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         throw Exception('Camera service not initialized');
       }
 
+      // Always initialize camera to ensure it's ready
+      // This handles both new initialization and re-initialization
       await _cameraService!.initializeCamera();
 
       // Set camera controller in detection service after initialization
@@ -78,10 +80,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             .read<DetectionCubit>()
             .setCameraController(_cameraService!.controller!);
         debugPrint('Camera controller set in detection service');
-
-        // Start detection when camera is initialized
-        _startDetectionLoop();
       }
+
+      // Always start detection loop after setting controller
+      _startDetectionLoop();
     } catch (e) {
       debugPrint('Camera initialization error: $e');
       rethrow;
@@ -241,25 +243,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
               LayoutConstants.sectionSpacer,
 
               // Video Section - Always show camera container
-              // Dynamic aspect ratio to match camera's native resolution
-              Container(
-                margin: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 10.0),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2D3250),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFFD700), width: 2),
-                ),
-                child: AspectRatio(
-                  // Use a more flexible aspect ratio that adapts to content
-                  aspectRatio:
-                      16 / 9, // Standard widescreen aspect ratio as fallback
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 10.0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2D3250),
+                    borderRadius: BorderRadius.circular(16),
+                    border:
+                        Border.all(color: const Color(0xFFFFD700), width: 2),
+                  ),
                   child: Container(
                     constraints: BoxConstraints(
-                      minHeight:
-                          200, // Reduced minimum height for better aspect ratio preservation
-                      maxHeight:
-                          300, // Reduced maximum height to prevent stretching
+                      minHeight: MediaQuery.of(context).orientation ==
+                              Orientation.portrait
+                          ? 240 // Minimum height for portrait mode (4:3 ratio)
+                          : 180, // Minimum height for landscape mode (4:3 ratio)
+                      maxHeight: MediaQuery.of(context).orientation ==
+                              Orientation.portrait
+                          ? 320 // Maximum height for portrait mode (4:3 ratio)
+                          : 240, // Maximum height for landscape mode (4:3 ratio)
                     ),
                     child: Stack(
                       children: [
@@ -366,26 +369,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               // Awakeness Level Section
               BlocBuilder<DetectionCubit, DetectionState>(
                 builder: (context, state) {
-                  Color backgroundColor;
                   String levelText;
                   String additionalInfo = '';
 
                   if (state is DetectionResultUpdated) {
                     switch (state.result.level) {
                       case DrowsinessLevel.alert:
-                        backgroundColor = Colors.green.withOpacity(0.5);
                         levelText = 'Alert';
                         break;
                       case DrowsinessLevel.mildFatigue:
-                        backgroundColor = Colors.yellow.withOpacity(0.5);
                         levelText = 'Mild Fatigue';
                         break;
                       case DrowsinessLevel.moderateFatigue:
-                        backgroundColor = Colors.orange.withOpacity(0.5);
                         levelText = 'Moderate Fatigue';
                         break;
                       case DrowsinessLevel.severeFatigue:
-                        backgroundColor = Colors.red.withOpacity(0.5);
                         levelText = 'Severe Fatigue';
                         break;
                     }
@@ -398,7 +396,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Head Tilt: ${state.result.headTilt?.toStringAsFixed(1) ?? 'N/A'}° | '
                         'Audio Alert: ${state.result.level == DrowsinessLevel.moderateFatigue || state.result.level == DrowsinessLevel.severeFatigue ? 'Active' : 'Inactive'}';
                   } else {
-                    backgroundColor = Colors.grey.withOpacity(0.5);
                     levelText = 'Initializing...';
                   }
 
@@ -409,11 +406,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16.0, vertical: 10.0),
                     decoration: BoxDecoration(
-                      color: backgroundColor,
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF2563EB), // Blue start
+                          Color(0xFF1E293B), // Dark blue end
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: backgroundColor.withOpacity(0.3),
+                          color: const Color(0xFF2563EB).withOpacity(0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -457,7 +461,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [
-                      Color(0xFF4338CA), // Purple start
+                      Color(0xFF2563EB), // Blue start
                       Color(0xFF1E293B), // Dark blue end
                     ],
                     begin: Alignment.topLeft,
@@ -472,77 +476,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Current Scent',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Lavender Relax',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Current Scent',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
                     ),
-                    Container(
-                      width: 70,
-                      height: 70,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Background circle (full border)
-                          Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(35),
-                              border: Border.all(
-                                color: const Color(0xFFFFD700).withOpacity(0.3),
-                                width: 4,
-                              ),
-                            ),
-                          ),
-                          // Progress arc (only showing percentage)
-                          Container(
-                            width: 70,
-                            height: 70,
-                            child: CustomPaint(
-                              painter: _CircularProgressPainter(
-                                progress: 0.77,
-                                strokeWidth: 4,
-                                color: const Color(0xFFFFD700),
-                              ),
-                            ),
-                          ),
-                          // Percentage text
-                          Container(
-                            width: 70,
-                            height: 70,
-                            alignment: Alignment.center,
-                            child: Text(
-                              '77%',
-                              style: const TextStyle(
-                                color: Color(0xFFFFD700),
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Lavender Relax',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -561,7 +511,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [
-                      Color(0xFF4338CA), // Purple start
+                      Color(0xFF2563EB), // Blue start
                       Color(0xFF1E293B), // Dark blue end
                     ],
                     begin: Alignment.topLeft,
@@ -598,7 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: const Text(
                             'view all',
                             style: TextStyle(
-                              color: Color(0xFF7C3AED),
+                              color: Color(0xFFFFD700),
                               fontSize: 14,
                             ),
                           ),
@@ -649,9 +599,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildNavItem(Icons.home, true, () {}),
-          _buildNavItem(Icons.shopping_bag, false, () {
-            // Navigate to shopping
-          }),
           TextButton(
             onPressed: () async {
               // Show immediate visual feedback
@@ -682,18 +629,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       'Camera turned off - all services and memory monitoring stopped');
                 }
               } else {
-                // Update state first to provide immediate UI feedback
-                if (mounted) {
-                  setState(() {
-                    _isVideoActive = true;
-                  });
-                } else {
-                  return;
-                }
-
                 // Initialize camera with proper error handling
                 try {
                   await _initializeCamera();
+
+                  // Only update state after successful initialization
+                  if (mounted &&
+                      _cameraService != null &&
+                      _cameraService!.isInitialized) {
+                    setState(() {
+                      _isVideoActive = true;
+                    });
+                  }
                 } catch (e) {
                   debugPrint('Error initializing camera: $e');
                   if (mounted) {
@@ -733,9 +680,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           _buildNavItem(Icons.settings, false,
               () => Navigator.of(context).pushNamed('/settings')),
-          _buildNavItem(Icons.person, false, () {
-            // Navigate to profile
-          }),
         ],
       ),
     );
@@ -897,56 +841,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
     }
-  }
-}
-
-// Custom painter for circular progress arc
-class _CircularProgressPainter extends CustomPainter {
-  final double progress;
-  final double strokeWidth;
-  final Color color;
-
-  _CircularProgressPainter({
-    required this.progress,
-    required this.strokeWidth,
-    required this.color,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-
-    // Draw background circle (very faint)
-    final backgroundPaint = Paint()
-      ..color = color.withOpacity(0.1)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, backgroundPaint);
-
-    // Draw progress arc
-    final progressPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final sweepAngle = 2 * pi * progress;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2, // Start from top
-      sweepAngle,
-      false,
-      progressPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_CircularProgressPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.strokeWidth != strokeWidth ||
-        oldDelegate.color != color;
   }
 }

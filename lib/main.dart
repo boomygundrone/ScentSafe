@@ -20,6 +20,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/bluetooth_setup_screen.dart';
 import 'screens/help_screen.dart';
 import 'screens/video_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -143,6 +144,7 @@ class MyApp extends StatelessWidget {
           '/bluetooth': (context) => const BluetoothSetupScreen(),
           '/help': (context) => const HelpScreen(),
           '/video': (context) => const VideoScreen(),
+          '/settings': (context) => const SettingsScreen(),
         },
       ),
     );
