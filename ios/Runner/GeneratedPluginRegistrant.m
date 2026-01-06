@@ -6,6 +6,12 @@
 
 #import "GeneratedPluginRegistrant.h"
 
+#if __has_include(<arkit_plugin/ArkitPlugin.h>)
+#import <arkit_plugin/ArkitPlugin.h>
+#else
+@import arkit_plugin;
+#endif
+
 #if __has_include(<audioplayers_darwin/AudioplayersDarwinPlugin.h>)
 #import <audioplayers_darwin/AudioplayersDarwinPlugin.h>
 #else
@@ -171,6 +177,7 @@
 @implementation GeneratedPluginRegistrant
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
+  [ArkitPlugin registerWithRegistrar:[registry registrarForPlugin:@"ArkitPlugin"]];
   [AudioplayersDarwinPlugin registerWithRegistrar:[registry registrarForPlugin:@"AudioplayersDarwinPlugin"]];
   [FPPBatteryPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPBatteryPlusPlugin"]];
   [CameraPlugin registerWithRegistrar:[registry registrarForPlugin:@"CameraPlugin"]];

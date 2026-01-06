@@ -41,6 +41,7 @@ dependencies:
 
   # Camera and image processing
   camera: ^0.10.5+2
+  arkit_plugin: ^1.0.6
 
   # AI/ML - Temporarily removed for web compatibility
   # tflite_flutter: ^0.10.4
