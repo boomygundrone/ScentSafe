@@ -10,28 +10,35 @@ class PerformanceService {
     _instance ??= PerformanceService._();
     return _instance!;
   }
-  
+
   PerformanceService._();
 
   final Battery _battery = Battery();
   Timer? _performanceMonitorTimer;
   bool _isLowPowerMode = false;
   int _currentBatteryLevel = 100;
-  
+
   /// Initialize performance monitoring
   Future<void> initialize() async {
-    // Get initial battery level
-    _currentBatteryLevel = await _battery.batteryLevel;
-    
-    // Listen to battery changes
-    _battery.onBatteryStateChanged.listen((state) {
-      _handleBatteryStateChange(state);
-    });
-    
-    // Start performance monitoring
-    _startPerformanceMonitoring();
+    try {
+      // Get initial battery level
+      _currentBatteryLevel = await _battery.batteryLevel;
+
+      // Listen to battery changes
+      _battery.onBatteryStateChanged.listen((state) {
+        _handleBatteryStateChange(state);
+      });
+
+      // Start performance monitoring
+      _startPerformanceMonitoring();
+    } catch (e) {
+      debugPrint(
+          'PerformanceService: Battery info unavailable (simulator?): $e');
+      // Start performance monitoring anyway without battery info
+      _startPerformanceMonitoring();
+    }
   }
-  
+
   /// Handle battery state changes
   Future<void> _handleBatteryStateChange(BatteryState state) async {
     switch (state) {
@@ -53,17 +60,18 @@ class PerformanceService {
       case BatteryState.unknown:
         break;
     }
-    
+
     debugPrint('Battery state changed: $state, Level: $_currentBatteryLevel%');
   }
-  
+
   /// Start performance monitoring
   void _startPerformanceMonitoring() {
-    _performanceMonitorTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _performanceMonitorTimer =
+        Timer.periodic(const Duration(seconds: 30), (timer) {
       _checkPerformanceMetrics();
     });
   }
-  
+
   /// Check performance metrics and adjust accordingly
   void _checkPerformanceMetrics() async {
     if (_isLowPowerMode) {
@@ -73,7 +81,7 @@ class PerformanceService {
       // Reduce ML processing frequency
     }
   }
-  
+
   /// Get optimal camera resolution based on device performance
   String getOptimalCameraResolution() {
     if (_isLowPowerMode) {
@@ -84,7 +92,7 @@ class PerformanceService {
       return 'high';
     }
   }
-  
+
   /// Get optimal detection frequency based on device performance
   int getOptimalDetectionFrequency() {
     if (_isLowPowerMode) {
@@ -95,11 +103,11 @@ class PerformanceService {
       return 100; // 100ms
     }
   }
-  
+
   /// Check if device is low-end
   Future<bool> isLowEndDevice() async {
     if (kIsWeb) return false;
-    
+
     try {
       if (Platform.isAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
@@ -112,17 +120,17 @@ class PerformanceService {
         final iosInfo = await DeviceInfoPlugin().iosInfo;
         final model = iosInfo.model;
         // Consider older iPhone models as low-end
-        return model.contains('iPhone 6') || 
-               model.contains('iPhone 7') || 
-               model.contains('iPhone 8');
+        return model.contains('iPhone 6') ||
+            model.contains('iPhone 7') ||
+            model.contains('iPhone 8');
       }
     } catch (e) {
       debugPrint('Error checking device performance: $e');
     }
-    
+
     return false;
   }
-  
+
   /// Check if Android model is known low-end device
   bool _isKnownLowEndAndroidModel(String model) {
     final lowEndModels = [
@@ -141,11 +149,11 @@ class PerformanceService {
       'Redmi 6',
       'Redmi 7',
     ];
-    
+
     return lowEndModels.any((lowEndModel) =>
         model.toLowerCase().contains(lowEndModel.toLowerCase()));
   }
-  
+
   /// Dispose performance service
   void dispose() {
     _performanceMonitorTimer?.cancel();

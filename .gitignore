@@ -1,71 +1,191 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# =============================================================================
+# CRITICAL SECURITY - NEVER COMMIT THESE FILES
+# =============================================================================
+**/google-services.json
+**/GoogleService-Info.plist
+**/service_account_key.json
+**/*.keystore
+**/*.jks
+**/key.properties
+.env*
+**/secrets.yaml
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# =============================================================================
+# Flutter/Dart
+# =============================================================================
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-.pub-cache/
+.packages
 .pub/
 /build/
+/.metadata
+**/doc/api/
+**/ios/Flutter/.last_build_id
+pubspec.lock
 
-# Symbolication related
+# Symbolication
 app.*.symbols
 
-# Obfuscation related
+# Obfuscation
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# =============================================================================
+# Android
+# =============================================================================
+/android/.gradle/
+/android/app/build/
+/android/app/outputs/
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+/android/local.properties
+/android/captures/
+/android/gradle-app.setting
+*.keystore
+*.jks
+key.properties
 
-# Node.js
+# =============================================================================
+# iOS
+# =============================================================================
+/ios/DerivedData/
+/ios/*.dSYM.zip
+/ios/*.dSYM
+/ios/Pods/
+/ios/.symlinks/
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/ephemeral/
+/ios/Flutter/app.flx
+/ios/Flutter/app.zip
+/ios/Flutter/flutter_assets/
+/ios/Flutter/flutter_export_environment.sh
+/ios/Runner/GeneratedPluginRegistrant.*
+**/Podfile.lock
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+**/*sync/
+.sconsign.dblite
+.tags*
+**/.vagrant/
+profile
+xcuserdata
+**/.generated/
+# iOS build artifacts
+ios/build/
+
+# =============================================================================
+# Node.js / Playwright (E2E Testing)
+# =============================================================================
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnp
 .pnp.js
-package-lock.json  # Optional: commit for reproducible installs
+package-lock.json
+yarn.lock
+.playwright-report/
+playwright-report/
+test-results/
 
-# CocoaPods / iOS Pods
-ios/Pods/
-ios/.symlinks/
-**/Podfile.lock
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
 
-# Flutter web
-web/build/
+# =============================================================================
+# IDE & Editors
+# =============================================================================
+# IntelliJ IDEA
+*.iml
+*.ipr
+*.iws
+.idea/
 
-# Kilo / backups
+# VSCode
+.vscode/
+*.code-workspace
+
+# Atom
+.atom/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# =============================================================================
+# System Files
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# =============================================================================
+# Temporary & Cache Files
+# =============================================================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+.cache/
+tmp/
+temp/
+*.log
+logs/
+
+# =============================================================================
+# Version Control
+# =============================================================================
+.svn/
+.git/
+.hg/
+
+# =============================================================================
+# Project-Specific (Remove if not needed)
+# =============================================================================
 kilo/
 md_backup*/
-/ios/Flutter/ephemeral
-ios/Flutter/Generated.xcconfig
-ios/Flutter/Generated.xcconfig
-ios/Flutter/Generated.xcconfig
-linux/flutter/generated_plugin_registrant.cc
+migrate_working_dir/
+
+# =============================================================================
+# Flutter Web
+# =============================================================================
+web/build/
+ios/build/

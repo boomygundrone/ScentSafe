@@ -123,9 +123,20 @@ class CameraService {
       _instance!._frontCamera = frontCamera;
       _instance!._serviceInitialized = true;
       _instance!._emitState(const CameraState._(CameraStateType.discovered));
+
+      // CRITICAL FIX: Only set _isInitialized to true after successful initialization
       _isInitialized = true;
+      debugPrint(
+          'CameraService: Service initialization completed successfully');
     } catch (e) {
       debugPrint('CameraService: Initialization failed: $e');
+      // CRITICAL FIX: Don't set _isInitialized to true on error
+      // Reset instance state if initialization failed
+      if (_instance != null) {
+        _instance!._serviceInitialized = false;
+        _instance!._availableCameras = null;
+        _instance!._frontCamera = null;
+      }
       _instance?._emitState(CameraState._(CameraStateType.error, e.toString()));
       throw app_errors.ErrorHandler.handle(e, StackTrace.current);
     }

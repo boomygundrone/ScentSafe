@@ -4,9 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 /// Firebase configuration matching Driver-Fatigue-Detection system
 class FirebaseConfig {
   static const FirebaseOptions current = FirebaseOptions(
-    apiKey: "AIzaSyBqPg5jH8sLnSgqwT9iP2ZmGd2o4kV8a4U",
-    appId: "1:107509751098449448042:android:4a5b6c7d8e9f0a1b2c3d4e",
-    messagingSenderId: "107509751098449448042",
+    apiKey: "AIzaSyDZARBtvVxe10zAbMtv9D5RlCjiWkK_rNs",
+    appId: "1:13138269820:ios:2ec9d60e2e88f6109e9bf9",
+    messagingSenderId: "13138269820",
     projectId: "scentsafe-17cfd",
     authDomain: "scentsafe-17cfd.firebaseapp.com",
     databaseURL:

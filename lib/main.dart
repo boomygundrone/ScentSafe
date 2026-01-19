@@ -24,6 +24,7 @@ import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  print('🚀 App starting...');
 
   // CRITICAL: Request permissions before initializing services
   try {
@@ -41,6 +42,7 @@ void main() async {
   }
 
   // Initialize Firebase first
+  print('🔥 Starting Firebase initialization...');
   try {
     await Firebase.initializeApp(
       options: FirebaseConfig.current,
@@ -48,11 +50,19 @@ void main() async {
     print('✅ Firebase initialized successfully');
   } catch (e) {
     print('❌ Firebase initialization failed: $e');
+    print('Stack trace: ${StackTrace.current}');
   }
 
   // Initialize Firebase service
+  print('🔥 Starting Firebase service...');
   final firebaseService = FirebaseService.instance;
-  await firebaseService.initialize();
+  try {
+    await firebaseService.initialize();
+    print('✅ Firebase service initialized');
+  } catch (e) {
+    print('❌ Firebase service initialization failed: $e');
+    print('Stack trace: ${StackTrace.current}');
+  }
 
   // Initialize services with proper dependency injection
   final authService = AuthService(firebaseService);
@@ -73,10 +83,13 @@ void main() async {
   // CRITICAL: Initialize camera service before app starts
   try {
     await CameraService.initializeService();
-    debugPrint('Camera service initialized at app level');
+    debugPrint('✅ Camera service initialized at app level');
   } catch (e) {
-    debugPrint('Failed to initialize camera service at app level: $e');
+    debugPrint('⚠️  Failed to initialize camera service at app level: $e');
+    debugPrint(
+        'ℹ️  Note: iOS Simulator may not have physical cameras. Use a physical device for testing.');
     // Continue without camera service - it will be initialized later if needed
+    // The UI will handle the absence of camera gracefully
   }
 
   runApp(MyApp(

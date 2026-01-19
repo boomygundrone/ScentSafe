@@ -39,6 +39,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _cameraService = CameraService.instance;
       debugPrint('Camera service instance acquired');
 
+      // CRITICAL FIX: Check if service is actually initialized before proceeding
+      if (!_cameraService!.isInitialized) {
+        debugPrint(
+            'Camera service not initialized, attempting to initialize...');
+        try {
+          await _cameraService!.initialize();
+          debugPrint('Camera service initialized successfully');
+        } catch (e) {
+          debugPrint('Camera service initialization failed: $e');
+          // Don't mark as ready if initialization failed
+          setState(() {
+            _isCameraServiceReady = true;
+          });
+          return;
+        }
+      }
+
       // Listen to camera state changes after initialization
       _cameraStateSubscription =
           _cameraService!.cameraStateStream.listen((state) {
@@ -49,7 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       });
 
-      // Mark camera service as ready
+      // Mark camera service as ready only if initialization succeeded
       setState(() {
         _isCameraServiceReady = true;
       });
@@ -68,6 +85,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (_cameraService == null) {
         throw Exception('Camera service not initialized');
+      }
+
+      // CRITICAL FIX: Ensure service is initialized before initializing camera
+      if (!_cameraService!.isInitialized) {
+        debugPrint(
+            'Camera service not initialized, attempting service initialization...');
+        try {
+          await _cameraService!.initialize();
+          debugPrint('Camera service initialized successfully');
+        } catch (e) {
+          debugPrint('Camera service initialization failed: $e');
+          throw Exception('Failed to initialize camera service: $e');
+        }
       }
 
       // Always initialize camera to ensure it's ready
@@ -128,8 +158,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+        '🏠 DashboardScreen.build() called - _isCameraServiceReady=$_isCameraServiceReady');
+
     // Show loading screen while camera service is initializing
     if (!_isCameraServiceReady) {
+      debugPrint('📸 Camera service not ready, showing loading screen');
       return Scaffold(
         backgroundColor: const Color(0xFF1A1B2E),
         body: const Center(
@@ -152,6 +186,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
     }
+
+    debugPrint('📸 Camera service ready, building main UI');
 
     return Scaffold(
       backgroundColor:
