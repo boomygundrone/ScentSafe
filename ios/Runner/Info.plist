@@ -48,6 +48,10 @@
 	<string>ScentSafe needs camera access to detect driver fatigue and prevent accidents</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ScentSafe needs microphone access for audio alerts</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>ScentSafe uses face tracking to detect driver fatigue and prevent accidents</string>
+	<key>ARKitUsageDescription</key>
+	<string>ScentSafe uses ARKit for advanced face tracking to detect driver fatigue</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 </dict>

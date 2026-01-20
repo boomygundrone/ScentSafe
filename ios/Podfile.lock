@@ -1188,8 +1188,12 @@ PODS:
     - abseil/meta/type_traits
     - abseil/xcprivacy
   - abseil/xcprivacy (1.20240722.0)
+  - arkit_plugin (0.0.1):
+    - Flutter
+    - GLTFSceneKit
   - audioplayers_darwin (0.0.1):
     - Flutter
+    - FlutterMacOS
   - battery_plus (1.0.0):
     - Flutter
   - BoringSSL-GRPC (0.0.37):
@@ -1277,6 +1281,7 @@ PODS:
   - Flutter (1.0.0)
   - flutter_secure_storage (6.0.0):
     - Flutter
+  - GLTFSceneKit (0.3.0)
   - google_mlkit_barcode_scanning (0.14.1):
     - Flutter
     - google_mlkit_commons
@@ -1629,7 +1634,8 @@ PODS:
   - SSZipArchive (2.6.0)
 
 DEPENDENCIES:
-  - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/ios`)
+  - arkit_plugin (from `.symlinks/plugins/arkit_plugin/ios`)
+  - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/darwin`)
   - battery_plus (from `.symlinks/plugins/battery_plus/ios`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - cloud_firestore (from `.symlinks/plugins/cloud_firestore/ios`)
@@ -1673,6 +1679,7 @@ SPEC REPOS:
     - FirebaseFirestore
     - FirebaseFirestoreInternal
     - FirebaseSharedSwift
+    - GLTFSceneKit
     - GoogleDataTransport
     - GoogleMLKit
     - GoogleToolboxForMac
@@ -1714,8 +1721,10 @@ SPEC REPOS:
     - SSZipArchive
 
 EXTERNAL SOURCES:
+  arkit_plugin:
+    :path: ".symlinks/plugins/arkit_plugin/ios"
   audioplayers_darwin:
-    :path: ".symlinks/plugins/audioplayers_darwin/ios"
+    :path: ".symlinks/plugins/audioplayers_darwin/darwin"
   battery_plus:
     :path: ".symlinks/plugins/battery_plus/ios"
   camera_avfoundation:
@@ -1773,7 +1782,8 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   abseil: a05cc83bf02079535e17169a73c5be5ba47f714b
-  audioplayers_darwin: ccf9c770ee768abb07e26d90af093f7bab1c12ab
+  arkit_plugin: 82331267ea3c39ff432223c1ecf38d818b4897ba
+  audioplayers_darwin: 4f9ca89d92d3d21cec7ec580e78ca888e5fb68bd
   battery_plus: b42253f6d2dde71712f8c36fef456d99121c5977
   BoringSSL-GRPC: dded2a44897e45f28f08ae87a55ee4bcd19bc508
   camera_avfoundation: 5675ca25298b6f81fa0a325188e7df62cc217741
@@ -1795,6 +1805,7 @@ SPEC CHECKSUMS:
   FirebaseSharedSwift: e17c654ef1f1a616b0b33054e663ad1035c8fd40
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
+  GLTFSceneKit: d1b437c514ba2aed5555afb0fddd64e030612d57
   google_mlkit_barcode_scanning: 8f5987f244a43fe1167689c548342a5174108159
   google_mlkit_commons: 2abe6a70e1824e431d16a51085cb475b672c8aab
   google_mlkit_digital_ink_recognition: 17bf08581ec4c778fe1ac525302fd3a10e8799e6

@@ -365,13 +365,23 @@ class DetectionService {
           'Processing camera image: ${cameraImage.width}x${cameraImage.height}, format: ${cameraImage.format}');
 
       // CRITICAL FIX: Check image size before processing
-      final estimatedSize =
-          cameraImage.width * cameraImage.height * 3; // RGB approximation
+      // Calculate estimated size based on format
+      int estimatedSize;
+      if (cameraImage.format.group == ImageFormatGroup.bgra8888) {
+        // BGRA8888: 4 bytes per pixel
+        estimatedSize = cameraImage.width * cameraImage.height * 4;
+      } else {
+        // YUV420: ~1.5 bytes per pixel (use 2 for safety)
+        estimatedSize = cameraImage.width * cameraImage.height * 2;
+      }
+
       if (estimatedSize > AppConfig.maxImageBufferSizeBytes) {
         debugPrint(
             'Image too large for processing: ${_formatBytes(estimatedSize)}');
         return;
       }
+
+      debugPrint('Estimated image size: ${_formatBytes(estimatedSize)}');
 
       // CRITICAL FIX: Use fast YUV concatenation with immediate memory management
       bytes = _concatenatePlanesFast(cameraImage.planes);
@@ -539,7 +549,64 @@ class DetectionService {
   /// CRITICAL FIX: Fast plane concatenation without memory tracking overhead
   Uint8List? _concatenatePlanesFast(List<Plane> planes) {
     try {
-      // Quick size check
+      debugPrint('=== PLANE CONCATENATION DEBUG ===');
+      debugPrint('Number of planes: ${planes.length}');
+
+      // CRITICAL FIX: Handle iOS BGRA8888 format (single plane)
+      if (planes.length == 1) {
+        debugPrint('Single plane detected - likely iOS BGRA8888 format');
+        final planeBytes = planes[0].bytes;
+        final planeBytesPerRow = planes[0].bytesPerRow;
+        debugPrint('Plane bytes: ${planeBytes.length} bytes');
+        debugPrint('Plane bytes per row: $planeBytesPerRow');
+
+        // CRITICAL FIX: Calculate expected size for BGRA8888 format
+        // BGRA8888 = 4 bytes per pixel
+        // Expected size = width × height × 4
+        // However, we need to account for potential padding in bytesPerRow
+        final expectedSize = planeBytesPerRow *
+            planes[0].bytes.lengthInBytes ~/
+            planeBytesPerRow;
+
+        // Calculate actual expected size based on dimensions
+        // For BGRA8888: 4 bytes per pixel
+        final bytesPerPixel = 4;
+        final width = planeBytesPerRow ~/ bytesPerPixel;
+        final height = planeBytes.length ~/ planeBytesPerRow;
+        final calculatedExpectedSize = width * height * bytesPerPixel;
+
+        debugPrint('Calculated dimensions: ${width}x${height}');
+        debugPrint('Expected size: $calculatedExpectedSize bytes');
+        debugPrint('Actual size: ${planeBytes.length} bytes');
+
+        // CRITICAL FIX: Check against full buffer limit for BGRA8888 (not half)
+        // BGRA8888 uses 4 bytes per pixel, so it's larger than YUV420
+        // Allow up to 90% of max buffer size to account for padding
+        final maxAllowedSize =
+            (AppConfig.maxImageBufferSizeBytes * 0.9).toInt();
+
+        if (planeBytes.length > maxAllowedSize) {
+          debugPrint(
+              'Plane bytes too large: ${planeBytes.length} bytes > $maxAllowedSize bytes');
+          return null;
+        }
+
+        // Verify size is reasonable (within 20% of calculated expected size)
+        final sizeVariance =
+            ((planeBytes.length - calculatedExpectedSize).abs() /
+                calculatedExpectedSize);
+        if (sizeVariance > 0.2) {
+          debugPrint(
+              'WARNING: Size variance too high: ${(sizeVariance * 100).toStringAsFixed(1)}%');
+          // Continue anyway as padding can cause variance
+        }
+
+        // Return bytes directly without concatenation for single-plane format
+        debugPrint('Using plane bytes directly (no concatenation needed)');
+        return planeBytes;
+      }
+
+      // Quick size check for multi-plane formats
       int totalSize = 0;
       for (final plane in planes) {
         totalSize += plane.bytes.length;
@@ -547,11 +614,9 @@ class DetectionService {
 
       if (totalSize > AppConfig.maxImageBufferSizeBytes ~/ 2) {
         // Half limit for safety
+        debugPrint('Total plane bytes too large: $totalSize bytes');
         return null;
       }
-
-      debugPrint('=== PLANE CONCATENATION DEBUG ===');
-      debugPrint('Number of planes: ${planes.length}');
 
       // CRITICAL FIX: Handle different YUV formats properly
       if (planes.length == 3) {
@@ -715,44 +780,75 @@ class DetectionService {
     }
   }
 
-  /// CRITICAL FIX: Create InputImage from YUV bytes with error handling
+  /// CRITICAL FIX: Create InputImage from camera image bytes with proper format handling
   InputImage? _createInputImageFromYuvBytes(
-      Uint8List yuvBytes, int width, int height) {
+      Uint8List imageBytes, int width, int height) {
     try {
-      // CRITICAL FIX: Try multiple formats to find one that works
-      // List of common formats to try in order
-      final formatsToTry = [
-        InputImageFormat.yuv420,
-        InputImageFormat.nv21,
-        InputImageFormat.bgra8888,
-      ];
-
-      for (final format in formatsToTry) {
-        try {
-          debugPrint('Trying InputImage format: ${format.toString()}');
-          final metadata = InputImageMetadata(
-            size: Size(width.toDouble(), height.toDouble()),
-            rotation: _rotationFromSensorOrientation(
-                _cameraController!.description.sensorOrientation),
-            format: format,
-            bytesPerRow: width, // 1 byte per pixel for Y channel
-          );
-
-          final result =
-              InputImage.fromBytes(bytes: yuvBytes, metadata: metadata);
-          debugPrint(
-              'Successfully created InputImage with format: ${format.toString()}');
-          return result;
-        } catch (e) {
-          debugPrint('Failed with format ${format.toString()}: $e');
-          continue; // Try next format
-        }
+      // CRITICAL FIX: Get the actual camera format from the current camera image
+      // This ensures we use the correct format for the platform
+      final cameraValue = _cameraController?.value;
+      if (cameraValue == null) {
+        debugPrint('Camera value is null, cannot determine format');
+        return null;
       }
 
-      debugPrint('All InputImage formats failed');
-      return null;
+      debugPrint('=== INPUT IMAGE FORMAT DEBUG ===');
+      debugPrint('Image dimensions: ${width}x${height}');
+      debugPrint('Bytes length: ${imageBytes.length}');
+
+      // CRITICAL FIX: Determine format based on byte size and platform
+      // BGRA8888: width × height × 4 bytes
+      // NV21: width × height × 1.5 bytes (approximately)
+      final expectedBgraSize = width * height * 4;
+      final expectedNv21Size = (width * height * 1.5).ceil();
+
+      InputImageFormat inputFormat;
+      int bytesPerRow;
+
+      // Determine format by comparing actual size to expected sizes
+      final sizeDiffFromBgra = (imageBytes.length - expectedBgraSize).abs();
+      final sizeDiffFromNv21 = (imageBytes.length - expectedNv21Size).abs();
+
+      // CRITICAL FIX: Use Platform.isIOS for accurate platform detection
+      final isIOS = Platform.isIOS;
+
+      if (isIOS || sizeDiffFromBgra < sizeDiffFromNv21) {
+        // iOS or closer to BGRA8888 size
+        debugPrint('Using BGRA8888 format (iOS or size match)');
+        inputFormat = InputImageFormat.bgra8888;
+        // BGRA8888: 4 bytes per pixel, but account for potential padding
+        // Calculate actual bytes per row from the byte array
+        bytesPerRow = (imageBytes.length / height).toInt();
+        // Ensure it's at least width * 4
+        if (bytesPerRow < width * 4) {
+          bytesPerRow = width * 4;
+        }
+      } else {
+        // Android or closer to NV21 size
+        debugPrint('Using NV21 format (Android or size match)');
+        inputFormat = InputImageFormat.nv21;
+        // NV21: 1 byte per pixel for Y channel
+        bytesPerRow = width;
+      }
+
+      debugPrint('Using InputImageFormat: ${inputFormat.toString()}');
+      debugPrint('Bytes per row: $bytesPerRow');
+
+      final metadata = InputImageMetadata(
+        size: Size(width.toDouble(), height.toDouble()),
+        rotation: _rotationFromSensorOrientation(
+            _cameraController!.description.sensorOrientation),
+        format: inputFormat,
+        bytesPerRow: bytesPerRow,
+      );
+
+      final result =
+          InputImage.fromBytes(bytes: imageBytes, metadata: metadata);
+      debugPrint('Successfully created InputImage');
+      return result;
     } catch (e) {
       debugPrint('Critical error in _createInputImageFromYuvBytes: $e');
+      debugPrint('Error type: ${e.runtimeType}');
       return null;
     }
   }
@@ -772,24 +868,55 @@ class DetectionService {
     }
   }
 
-  /// Create InputImage from camera image directly
+  /// Create InputImage from camera image directly with proper format detection
   InputImage? _createInputImageFromCameraImage(CameraImage cameraImage) {
     try {
+      debugPrint('=== CAMERA IMAGE TO INPUT IMAGE DEBUG ===');
+      debugPrint('Image format: ${cameraImage.format.group}');
+      debugPrint('Number of planes: ${cameraImage.planes.length}');
+      debugPrint('Image size: ${cameraImage.width}x${cameraImage.height}');
+
+      // Determine the correct InputImageFormat based on camera format
+      InputImageFormat inputFormat;
+
+      if (cameraImage.format.group == ImageFormatGroup.bgra8888) {
+        debugPrint('Using BGRA8888 format (iOS)');
+        inputFormat = InputImageFormat.bgra8888;
+      } else if (cameraImage.format.group == ImageFormatGroup.yuv420 ||
+          cameraImage.format.group == ImageFormatGroup.nv21) {
+        debugPrint('Using NV21 format (Android)');
+        inputFormat = InputImageFormat.nv21;
+      } else {
+        debugPrint('Unknown format, defaulting to NV21');
+        inputFormat = InputImageFormat.nv21;
+      }
+
       // Get camera image metadata
       final metadata = InputImageMetadata(
         size: Size(cameraImage.width.toDouble(), cameraImage.height.toDouble()),
         rotation: _rotationFromSensorOrientation(
             _cameraController!.description.sensorOrientation),
-        format: InputImageFormat.nv21, // Use NV21 as default
+        format: inputFormat,
         bytesPerRow: cameraImage.planes[0].bytesPerRow,
       );
 
-      // Convert camera image to bytes
-      final bytes = _concatenatePlanes(cameraImage.planes);
+      // For BGRA8888, use the plane bytes directly without concatenation
+      Uint8List bytes;
+      if (cameraImage.format.group == ImageFormatGroup.bgra8888) {
+        debugPrint('Using plane bytes directly for BGRA8888');
+        bytes = cameraImage.planes[0].bytes;
+      } else {
+        // For YUV formats, concatenate planes
+        debugPrint('Concatenating planes for YUV format');
+        bytes = _concatenatePlanes(cameraImage.planes);
+      }
 
-      return InputImage.fromBytes(bytes: bytes, metadata: metadata);
+      final result = InputImage.fromBytes(bytes: bytes, metadata: metadata);
+      debugPrint('Successfully created InputImage from camera image');
+      return result;
     } catch (e) {
       debugPrint('Error creating InputImage from camera image: $e');
+      debugPrint('Error type: ${e.runtimeType}');
       return null;
     }
   }
@@ -908,21 +1035,52 @@ class DetectionService {
     }
   }
 
-  /// Convert CameraImage to ML Kit InputImage
+  /// Convert CameraImage to ML Kit InputImage with format detection
   InputImage? _convertCameraImageToInputImage(
       CameraImage image, int sensorOrientation) {
     try {
-      final bytes = _concatenatePlanes(image.planes);
+      debugPrint('=== CONVERT CAMERA IMAGE DEBUG ===');
+      debugPrint('Image format: ${image.format.group}');
+      debugPrint('Number of planes: ${image.planes.length}');
+
+      // Determine the correct InputImageFormat
+      InputImageFormat inputFormat;
+
+      if (image.format.group == ImageFormatGroup.bgra8888) {
+        debugPrint('Using BGRA8888 format (iOS)');
+        inputFormat = InputImageFormat.bgra8888;
+      } else if (image.format.group == ImageFormatGroup.yuv420 ||
+          image.format.group == ImageFormatGroup.nv21) {
+        debugPrint('Using NV21 format (Android)');
+        inputFormat = InputImageFormat.nv21;
+      } else {
+        debugPrint('Unknown format, defaulting to NV21');
+        inputFormat = InputImageFormat.nv21;
+      }
+
+      // Get bytes based on format
+      Uint8List bytes;
+      if (image.format.group == ImageFormatGroup.bgra8888) {
+        debugPrint('Using plane bytes directly for BGRA8888');
+        bytes = image.planes[0].bytes;
+      } else {
+        debugPrint('Concatenating planes for YUV format');
+        bytes = _concatenatePlanes(image.planes);
+      }
+
       final metadata = InputImageMetadata(
         size: Size(image.width.toDouble(), image.height.toDouble()),
         rotation: _rotationFromSensorOrientation(sensorOrientation),
-        format: InputImageFormat.nv21,
+        format: inputFormat,
         bytesPerRow: image.planes[0].bytesPerRow,
       );
 
-      return InputImage.fromBytes(bytes: bytes, metadata: metadata);
+      final result = InputImage.fromBytes(bytes: bytes, metadata: metadata);
+      debugPrint('Successfully converted camera image to InputImage');
+      return result;
     } catch (e) {
       debugPrint('Error converting camera image: $e');
+      debugPrint('Error type: ${e.runtimeType}');
       return null;
     }
   }
@@ -975,8 +1133,12 @@ class DetectionService {
 
     // CRITICAL FIX: More aggressive memory management
     final bufferSize = buffer.length;
-    final maxBufferSize = AppConfig.maxImageBufferSizeBytes ~/
-        3; // One third of total limit per buffer
+
+    // CRITICAL FIX: Calculate max buffer size based on format
+    // BGRA8888 format uses 4 bytes per pixel, so buffers are larger than YUV420
+    // Allow up to 60% of total limit for BGRA8888 buffers (vs 33% for YUV)
+    // This accommodates the 480x640 BGRA8888 image (1,228,800 bytes)
+    final maxBufferSize = (AppConfig.maxImageBufferSizeBytes * 0.6).toInt();
 
     if (bufferSize > maxBufferSize) {
       debugPrint(

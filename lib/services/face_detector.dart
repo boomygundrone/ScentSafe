@@ -121,19 +121,52 @@ class FaceDetectorService {
       final plane = cameraImage.planes.first;
       final bytes = plane.bytes;
 
-      // Create InputImage from bytes
-      return InputImage.fromBytes(
-        bytes: bytes,
-        metadata: InputImageMetadata(
-          size:
-              Size(cameraImage.width.toDouble(), cameraImage.height.toDouble()),
-          rotation: InputImageRotation.rotation0deg,
-          format: InputImageFormat.nv21,
-          bytesPerRow: plane.bytesPerRow,
-        ),
+      // Determine the correct InputImageFormat based on camera format
+      InputImageFormat inputFormat;
+
+      debugPrint('=== IMAGE FORMAT DEBUG ===');
+      debugPrint('Camera format group: ${cameraImage.format.group}');
+      debugPrint('Camera format raw: ${cameraImage.format.raw}');
+      debugPrint('Number of planes: ${cameraImage.planes.length}');
+      debugPrint('Image size: ${cameraImage.width}x${cameraImage.height}');
+
+      // Handle iOS BGRA8888 format (single plane)
+      if (cameraImage.format.group == ImageFormatGroup.bgra8888) {
+        debugPrint('Detected iOS BGRA8888 format');
+        inputFormat = InputImageFormat.bgra8888;
+      }
+      // Handle Android NV21 format (typically 1 or 3 planes)
+      else if (cameraImage.format.group == ImageFormatGroup.yuv420 ||
+          cameraImage.format.group == ImageFormatGroup.nv21) {
+        debugPrint('Detected Android NV21/YUV420 format');
+        inputFormat = InputImageFormat.nv21;
+      }
+      // Fallback to NV21 for other formats
+      else {
+        debugPrint('Unknown format, defaulting to NV21');
+        inputFormat = InputImageFormat.nv21;
+      }
+
+      debugPrint('Using InputImageFormat: ${inputFormat.toString()}');
+
+      // Create InputImage from bytes with correct format
+      final metadata = InputImageMetadata(
+        size: Size(cameraImage.width.toDouble(), cameraImage.height.toDouble()),
+        rotation: InputImageRotation.rotation0deg,
+        format: inputFormat,
+        bytesPerRow: plane.bytesPerRow,
       );
+
+      final inputImage = InputImage.fromBytes(
+        bytes: bytes,
+        metadata: metadata,
+      );
+
+      debugPrint('Successfully created InputImage');
+      return inputImage;
     } catch (e) {
       debugPrint('Error converting camera image: $e');
+      debugPrint('Error details: ${e.runtimeType}');
       return null;
     }
   }
