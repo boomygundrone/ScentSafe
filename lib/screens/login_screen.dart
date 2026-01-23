@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// Firebase import commented out - dependencies not available
+// import 'package:firebase_auth/firebase_auth.dart';
 import '../blocs/auth_cubit.dart';
 
 class LoginScreen extends StatefulWidget {

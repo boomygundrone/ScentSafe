@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:battery_plus/battery_plus.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 class PerformanceService {
   static PerformanceService? _instance;
@@ -13,7 +10,6 @@ class PerformanceService {
 
   PerformanceService._();
 
-  final Battery _battery = Battery();
   Timer? _performanceMonitorTimer;
   bool _isLowPowerMode = false;
   int _currentBatteryLevel = 100;
@@ -21,15 +17,10 @@ class PerformanceService {
   /// Initialize performance monitoring
   Future<void> initialize() async {
     try {
-      // Get initial battery level
-      _currentBatteryLevel = await _battery.batteryLevel;
+      debugPrint(
+          'PerformanceService: Battery monitoring disabled (dependency issue)');
 
-      // Listen to battery changes
-      _battery.onBatteryStateChanged.listen((state) {
-        _handleBatteryStateChange(state);
-      });
-
-      // Start performance monitoring
+      // Start performance monitoring anyway without battery info
       _startPerformanceMonitoring();
     } catch (e) {
       debugPrint(
@@ -37,31 +28,6 @@ class PerformanceService {
       // Start performance monitoring anyway without battery info
       _startPerformanceMonitoring();
     }
-  }
-
-  /// Handle battery state changes
-  Future<void> _handleBatteryStateChange(BatteryState state) async {
-    switch (state) {
-      case BatteryState.charging:
-        _isLowPowerMode = false;
-        break;
-      case BatteryState.discharging:
-        _currentBatteryLevel = await _battery.batteryLevel;
-        _isLowPowerMode = _currentBatteryLevel < 20;
-        break;
-      case BatteryState.full:
-        _isLowPowerMode = false;
-        _currentBatteryLevel = 100;
-        break;
-      case BatteryState.connectedNotCharging:
-        _currentBatteryLevel = await _battery.batteryLevel;
-        _isLowPowerMode = _currentBatteryLevel < 20;
-        break;
-      case BatteryState.unknown:
-        break;
-    }
-
-    debugPrint('Battery state changed: $state, Level: $_currentBatteryLevel%');
   }
 
   /// Start performance monitoring
@@ -109,49 +75,14 @@ class PerformanceService {
     if (kIsWeb) return false;
 
     try {
-      if (Platform.isAndroid) {
-        final androidInfo = await DeviceInfoPlugin().androidInfo;
-        // Use a heuristic based on device model and SDK version for low-end detection
-        final sdkInt = androidInfo.version.sdkInt;
-        final model = androidInfo.model;
-        // Consider Android devices with SDK < 29 or specific low-end models as low-end
-        return sdkInt < 29 || _isKnownLowEndAndroidModel(model);
-      } else if (Platform.isIOS) {
-        final iosInfo = await DeviceInfoPlugin().iosInfo;
-        final model = iosInfo.model;
-        // Consider older iPhone models as low-end
-        return model.contains('iPhone 6') ||
-            model.contains('iPhone 7') ||
-            model.contains('iPhone 8');
-      }
+      // Device info checking disabled (dependency issue)
+      // Default to false (not low-end)
+      return false;
     } catch (e) {
       debugPrint('Error checking device performance: $e');
     }
 
     return false;
-  }
-
-  /// Check if Android model is known low-end device
-  bool _isKnownLowEndAndroidModel(String model) {
-    final lowEndModels = [
-      'Galaxy J2',
-      'Galaxy J3',
-      'Galaxy J5',
-      'Galaxy J7',
-      'Galaxy A10',
-      'Galaxy A20',
-      'Moto E4',
-      'Moto G5',
-      'Moto G6',
-      'Nokia 2',
-      'Nokia 3',
-      'Redmi 5',
-      'Redmi 6',
-      'Redmi 7',
-    ];
-
-    return lowEndModels.any((lowEndModel) =>
-        model.toLowerCase().contains(lowEndModel.toLowerCase()));
   }
 
   /// Dispose performance service

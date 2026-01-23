@@ -1,9 +1,8 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:audioplayers/audioplayers.dart';
 
 /// Audio alert service for drowsiness detection
 /// Matches Python implementation using pygame for audio playback
+/// NOTE: Audio functionality disabled due to dependency issues
 class AudioAlertService {
   static AudioAlertService? _instance;
   static AudioAlertService get instance {
@@ -15,16 +14,12 @@ class AudioAlertService {
     // Private constructor for singleton pattern
   }
 
-  AudioPlayer? _alertPlayer;
   bool _isPlaying = false;
 
   /// Initialize audio service
   Future<void> initialize() async {
     try {
-      debugPrint('AudioAlertService: Initializing audio player');
-      _alertPlayer = AudioPlayer();
-      await _alertPlayer!.setSource(AssetSource('audio/wakeup.mp3'));
-      debugPrint('AudioAlertService: Audio player initialized successfully');
+      debugPrint('AudioAlertService: Audio player disabled (dependency issue)');
     } catch (e) {
       debugPrint('AudioAlertService: Failed to initialize audio player: $e');
     }
@@ -32,21 +27,20 @@ class AudioAlertService {
 
   /// Play alert sound once
   Future<void> playAlert() async {
-    if (_alertPlayer == null || _isPlaying) {
-      debugPrint(
-          'AudioAlertService: Audio player not ready or already playing');
+    if (_isPlaying) {
+      debugPrint('AudioAlertService: Audio already playing');
       return;
     }
 
     try {
       _isPlaying = true;
-      await _alertPlayer!.play(AssetSource('audio/wakeup.mp3'));
-      debugPrint('AudioAlertService: Alert sound playing');
+      debugPrint('AudioAlertService: Alert sound playing (simulated)');
 
-      // Auto-stop after playing once (matching Python behavior)
-      _alertPlayer!.onPlayerComplete.listen((_) {
+      // Simulate audio playback completion
+      Future.delayed(const Duration(seconds: 2), () {
         _isPlaying = false;
-        debugPrint('AudioAlertService: Alert sound finished playing');
+        debugPrint(
+            'AudioAlertService: Alert sound finished playing (simulated)');
       });
     } catch (e) {
       debugPrint('AudioAlertService: Error playing alert: $e');
@@ -56,16 +50,9 @@ class AudioAlertService {
 
   /// Play alert sound continuously (loop)
   Future<void> playAlertLoop() async {
-    if (_alertPlayer == null) {
-      debugPrint('AudioAlertService: Audio player not ready');
-      return;
-    }
-
     try {
       _isPlaying = true;
-      await _alertPlayer!.setReleaseMode(ReleaseMode.loop);
-      await _alertPlayer!.play(AssetSource('audio/wakeup.mp3'));
-      debugPrint('AudioAlertService: Alert sound playing in loop');
+      debugPrint('AudioAlertService: Alert sound playing in loop (simulated)');
     } catch (e) {
       debugPrint('AudioAlertService: Error playing alert loop: $e');
       _isPlaying = false;
@@ -74,15 +61,9 @@ class AudioAlertService {
 
   /// Stop alert sound
   Future<void> stopAlert() async {
-    if (_alertPlayer == null) {
-      debugPrint('AudioAlertService: Audio player not ready');
-      return;
-    }
-
     try {
       _isPlaying = false;
-      await _alertPlayer!.stop();
-      debugPrint('AudioAlertService: Alert sound stopped');
+      debugPrint('AudioAlertService: Alert sound stopped (simulated)');
     } catch (e) {
       debugPrint('AudioAlertService: Error stopping alert: $e');
     }
@@ -93,8 +74,6 @@ class AudioAlertService {
 
   /// Dispose audio service
   void dispose() {
-    _alertPlayer?.dispose();
-    _alertPlayer = null;
     _isPlaying = false;
     debugPrint('AudioAlertService: Audio service disposed');
   }

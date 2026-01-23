@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'faq_screen.dart';
+import '../blocs/localization_cubit.dart';
+import '../widgets/language_switcher.dart';
+import '../services/app_localization_service.dart';
+
+/// Extension for String localization
+extension StringLocalization on String {
+  String tr() {
+    return AppLocalizationService.instance.translate(this);
+  }
+}
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,188 +26,199 @@ class SettingsScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Settings',
-          style: TextStyle(
+        title: Text(
+          'settings'.tr(),
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Profile Section
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF7C3AED),
-                    Color(0xFF4338CA),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      image: const DecorationImage(
-                        image: AssetImage('images/profile_avatar.png'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Marcus',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'marcus@example.com',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 14,
-                          ),
-                        ),
+      body: BlocBuilder<LocalizationCubit, Locale>(
+        builder: (context, locale) {
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profile Section
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF7C3AED),
+                        Color(0xFF4338CA),
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.edit,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      // Navigate to profile edit
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // FAQ Section
-            _buildSettingsSection(
-              context,
-              title: 'FAQ',
-              icon: Icons.help_outline,
-              items: [
-                _SettingsItem(
-                  icon: Icons.help_outline,
-                  title: 'Frequently Asked Questions',
-                  subtitle: 'Browse comprehensive documentation',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const FAQScreen(),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                          image: const DecorationImage(
+                            image: AssetImage('images/profile_avatar.png'),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
-                    );
-                  },
-                ),
-              ],
-            ),
-
-            _buildSettingsSection(
-              context,
-              title: 'Contact Support',
-              icon: Icons.contact_support_outlined,
-              items: [
-                _SettingsItem(
-                  icon: Icons.email_outlined,
-                  title: 'Email Support',
-                  subtitle: 'support@scentsafe.com',
-                  onTap: () {
-                    _showContactDialog(
-                        context, 'Email', 'support@scentsafe.com');
-                  },
-                ),
-                _SettingsItem(
-                  icon: Icons.phone_outlined,
-                  title: 'Phone Support',
-                  subtitle: '+1 (555) 123-4567',
-                  onTap: () {
-                    _showContactDialog(context, 'Phone', '+1 (555) 123-4567');
-                  },
-                ),
-                _SettingsItem(
-                  icon: Icons.language_outlined,
-                  title: 'Website',
-                  subtitle: 'www.scentsafe.com',
-                  onTap: () {
-                    _showContactDialog(context, 'Website', 'www.scentsafe.com');
-                  },
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Logout Button
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  _showLogoutDialog(context);
-                },
-                icon: const Icon(
-                  Icons.logout,
-                  color: Colors.red,
-                ),
-                label: const Text(
-                  'Log Out',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Marcus',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'marcus@example.com',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          // Navigate to profile edit
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+
+                const SizedBox(height: 8),
+
+                // Language Section
+                _buildLanguageSection(context),
+
+                const SizedBox(height: 8),
+
+                // FAQ Section
+                _buildSettingsSection(
+                  context,
+                  title: 'faq'.tr(),
+                  icon: Icons.help_outline,
+                  items: [
+                    _SettingsItem(
+                      icon: Icons.help_outline,
+                      title: 'frequently_asked_questions'.tr(),
+                      subtitle: 'browse_documentation'.tr(),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const FAQScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+
+                _buildSettingsSection(
+                  context,
+                  title: 'contact_support'.tr(),
+                  icon: Icons.contact_support_outlined,
+                  items: [
+                    _SettingsItem(
+                      icon: Icons.email_outlined,
+                      title: 'email_support'.tr(),
+                      subtitle: 'support_email'.tr(),
+                      onTap: () {
+                        _showContactDialog(
+                            context, 'email'.tr(), 'support@scentsafe.com');
+                      },
+                    ),
+                    _SettingsItem(
+                      icon: Icons.phone_outlined,
+                      title: 'phone_support'.tr(),
+                      subtitle: 'support_phone'.tr(),
+                      onTap: () {
+                        _showContactDialog(
+                            context, 'phone'.tr(), '+1 (555) 123-4567');
+                      },
+                    ),
+                    _SettingsItem(
+                      icon: Icons.language_outlined,
+                      title: 'website'.tr(),
+                      subtitle: 'support_website'.tr(),
+                      onTap: () {
+                        _showContactDialog(
+                            context, 'website'.tr(), 'www.scentsafe.com');
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Logout Button
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      _showLogoutDialog(context);
+                    },
+                    icon: const Icon(
+                      Icons.logout,
+                      color: Colors.red,
+                    ),
+                    label: Text(
+                      'log_out'.tr(),
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 32),
+                const SizedBox(height: 32),
 
-            // App Version
-            Center(
-              child: Text(
-                'ScentSafe v1.0.0',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
+                // App Version
+                Center(
+                  child: Text(
+                    'ScentSafe v1.0.0',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 24),
-          ],
-        ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -350,11 +372,11 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              type == 'Email'
-                  ? 'We typically respond within 24 hours.'
-                  : type == 'Phone'
-                      ? 'Available Mon-Fri, 9AM-6PM EST.'
-                      : 'Visit us for documentation and guides.',
+              type == 'email'.tr()
+                  ? 'response_time'.tr()
+                  : type == 'phone'.tr()
+                      ? 'support_hours'.tr()
+                      : 'visit_website'.tr(),
               style: const TextStyle(color: Colors.grey, fontSize: 14),
             ),
           ],
@@ -362,9 +384,9 @@ class SettingsScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Close',
-              style: TextStyle(color: Colors.grey),
+            child: Text(
+              'close'.tr(),
+              style: const TextStyle(color: Colors.grey),
             ),
           ),
           TextButton(
@@ -372,16 +394,16 @@ class SettingsScreen extends StatelessWidget {
               Navigator.of(context).pop();
               // Copy to clipboard or open
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Copied to clipboard!'),
-                  backgroundColor: Color(0xFF7C3AED),
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  content: Text('copied_to_clipboard'.tr()),
+                  backgroundColor: const Color(0xFF7C3AED),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             },
-            child: const Text(
-              'Copy',
-              style: TextStyle(color: Color(0xFF7C3AED)),
+            child: Text(
+              'copy'.tr(),
+              style: const TextStyle(color: Color(0xFF7C3AED)),
             ),
           ),
         ],
@@ -412,22 +434,22 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const Text(
-              'Log Out',
-              style: TextStyle(color: Colors.white),
+            Text(
+              'log_out'.tr(),
+              style: const TextStyle(color: Colors.white),
             ),
           ],
         ),
-        content: const Text(
-          'Are you sure you want to log out? You will need to sign in again to access your account.',
-          style: TextStyle(color: Colors.grey, fontSize: 14),
+        content: Text(
+          'logout_confirmation'.tr(),
+          style: const TextStyle(color: Colors.grey, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey),
+            child: Text(
+              'cancel'.tr(),
+              style: const TextStyle(color: Colors.grey),
             ),
           ),
           TextButton(
@@ -436,15 +458,69 @@ class SettingsScreen extends StatelessWidget {
               // Navigate to login screen
               Navigator.of(context).pushReplacementNamed('/login');
             },
-            child: const Text(
-              'Log Out',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              'log_out'.tr(),
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+Widget _buildLanguageSection(BuildContext context) {
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xFF2D3250),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.language_outlined,
+                  color: Color(0xFF7C3AED),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'language'.tr(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFF3D4250)),
+        // Language Switcher
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: const LanguageSwitcher(
+            useDropdown: false,
+            showFlag: true,
+            showNativeName: false,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _SettingsItem {

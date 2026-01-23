@@ -28,6 +28,17 @@ class CameraService {
   List<CameraDescription>? _availableCameras;
   CameraDescription? _frontCamera;
 
+  /// CRITICAL FIX: Separate service initialization from camera controller initialization
+  /// This property indicates if cameras have been discovered (service is ready)
+  bool get isServiceInitialized => _serviceInitialized;
+
+  /// CRITICAL FIX: This property now only checks if the camera controller is ready
+  /// The dashboard should check isServiceInitialized instead to allow UI to load
+  bool get isInitialized =>
+      _serviceInitialized &&
+      _cameraController != null &&
+      _cameraController!.value.isInitialized;
+
   // CRITICAL FIX: Memory management for image buffer disposal
   Timer? _memoryCleanupTimer;
   final List<Uint8List> _pendingImageBuffers = [];
@@ -60,13 +71,7 @@ class CameraService {
   /// Current camera controller
   CameraController? get controller => _cameraController;
 
-  /// Whether camera is initialized
-  bool get isInitialized =>
-      _serviceInitialized &&
-      _cameraController != null &&
-      _cameraController!.value.isInitialized;
-
-  /// Static method to initialize the camera service without accessing instance
+  /// Static method to initialize the camera service without accessing the instance
   static Future<void> initializeService() async {
     if (_isInitialized) return; // Prevent double initialization
 
@@ -85,32 +90,8 @@ class CameraService {
 
       debugPrint('CameraService: Found ${cameras.length} cameras');
 
-      // Find front camera - ensure we always use front camera
-      CameraDescription? frontCamera;
-
-      // First try to find explicit front camera
-      try {
-        frontCamera = cameras.firstWhere(
-          (camera) => camera.lensDirection == CameraLensDirection.front,
-        );
-        debugPrint('Front camera found: ${frontCamera.lensDirection}');
-      } catch (e) {
-        // If no explicit front camera, try external camera (often front-facing on emulators)
-        try {
-          frontCamera = cameras.firstWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.external,
-          );
-          debugPrint(
-              'Using external camera as front camera: ${frontCamera.lensDirection}');
-        } catch (e2) {
-          // Last resort: use any camera but log the issue
-          debugPrint(
-              'WARNING: No front camera found, using first available camera: ${cameras.first.lensDirection}');
-          debugPrint(
-              'Available cameras: ${cameras.map((c) => c.lensDirection).toList()}');
-          frontCamera = cameras.first;
-        }
-      }
+      // Find front camera using common logic
+      final frontCamera = _findFrontCamera(cameras);
 
       debugPrint('CameraService: Front camera selected');
       debugPrint('Selected camera: ${frontCamera.lensDirection}');
@@ -161,51 +142,83 @@ class CameraService {
 
       debugPrint('CameraService: Found ${_availableCameras!.length} cameras');
 
-      // Find front camera - ensure we always use front camera
-      // First try to find explicit front camera
-      try {
-        _frontCamera = _availableCameras!.firstWhere(
-          (camera) => camera.lensDirection == CameraLensDirection.front,
-        );
-        debugPrint('Front camera found: ${_frontCamera!.lensDirection}');
-      } catch (e) {
-        // If no explicit front camera, try external camera (often front-facing on emulators)
-        try {
-          _frontCamera = _availableCameras!.firstWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.external,
-          );
-          debugPrint(
-              'Using external camera as front camera: ${_frontCamera!.lensDirection}');
-        } catch (e2) {
-          // Last resort: use any camera but log the issue
-          debugPrint(
-              'WARNING: No front camera found, using first available camera: ${_availableCameras!.first.lensDirection}');
-          debugPrint(
-              'Available cameras: ${_availableCameras!.map((c) => c.lensDirection).toList()}');
-          _frontCamera = _availableCameras!.first;
-        }
-      }
+      // Find front camera using common logic
+      _frontCamera = _findFrontCamera(_availableCameras!);
 
       debugPrint('CameraService: Front camera selected');
       debugPrint('Selected camera: ${_frontCamera!.lensDirection}');
-      _emitState(const CameraState._(CameraStateType.discovered));
+
+      // CRITICAL FIX: Set _serviceInitialized BEFORE emitting state to ensure service is marked ready
       _serviceInitialized = true;
+      _emitState(const CameraState._(CameraStateType.discovered));
+
+      // CRITICAL FIX: Set _isInitialized AFTER _serviceInitialized to maintain proper state order
       _isInitialized = true;
+
+      debugPrint(
+          'CameraService: Service initialized successfully, _serviceInitialized=$_serviceInitialized, _isInitialized=$_isInitialized');
     } catch (e) {
       debugPrint('CameraService: Initialization failed: $e');
+      // CRITICAL FIX: Ensure _serviceInitialized is false on error
+      _serviceInitialized = false;
       _emitState(CameraState._(CameraStateType.error, e.toString()));
       throw app_errors.ErrorHandler.handle(e, StackTrace.current);
     }
   }
 
+  /// Common logic to find front camera from available cameras
+  static CameraDescription _findFrontCamera(List<CameraDescription> cameras) {
+    CameraDescription? frontCamera;
+
+    // First try to find explicit front camera
+    try {
+      frontCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.front,
+      );
+      debugPrint('Front camera found: ${frontCamera.lensDirection}');
+    } catch (e) {
+      // If no explicit front camera, try external camera (often front-facing on emulators)
+      try {
+        frontCamera = cameras.firstWhere(
+          (camera) => camera.lensDirection == CameraLensDirection.external,
+        );
+        debugPrint(
+            'Using external camera as front camera: ${frontCamera.lensDirection}');
+      } catch (e2) {
+        // Last resort: use any camera but log the issue
+        debugPrint(
+            'WARNING: No front camera found, using first available camera: ${cameras.first.lensDirection}');
+        debugPrint(
+            'Available cameras: ${cameras.map((c) => c.lensDirection).toList()}');
+        frontCamera = cameras.first;
+      }
+    }
+
+    return frontCamera;
+  }
+
   /// Initialize camera controller with orientation-specific resolution
   Future<void> initializeCamera(
       {ResolutionPreset resolution = ResolutionPreset.medium}) async {
+    debugPrint(
+        'CameraService: initializeCamera called, _serviceInitialized=$_serviceInitialized, _isInitialized=$_isInitialized');
+
     if (!_serviceInitialized) {
-      throw app_errors.ServiceInitializationException(
-        message: 'CameraService must be initialized before initializing camera',
-        code: 'SERVICE_NOT_INITIALIZED',
-      );
+      debugPrint(
+          'CameraService: Service not initialized, attempting to initialize service...');
+      try {
+        await initialize();
+        debugPrint(
+            'CameraService: Service initialized successfully in initializeCamera');
+      } catch (e) {
+        debugPrint(
+            'CameraService: Failed to initialize service in initializeCamera: $e');
+        throw app_errors.ServiceInitializationException(
+          message:
+              'CameraService must be initialized before initializing camera',
+          code: 'SERVICE_NOT_INITIALIZED',
+        );
+      }
     }
 
     try {
@@ -228,6 +241,8 @@ class CameraService {
       await disposeCamera();
 
       if (_frontCamera == null) {
+        debugPrint(
+            'CameraService: _frontCamera is null, re-initializing service...');
         await initialize(); // Ensure cameras are discovered
       }
 
@@ -251,7 +266,9 @@ class CameraService {
         enableAudio: false,
       );
 
+      debugPrint('CameraService: Starting camera controller initialization...');
       await _cameraController!.initialize();
+      debugPrint('CameraService: Camera controller initialized successfully');
 
       // Log actual camera resolution after initialization
       final actualPreviewSize = _cameraController!.value.previewSize;
@@ -278,22 +295,37 @@ class CameraService {
   Future<void> disposeCamera() async {
     try {
       if (_cameraController != null) {
-        // CRITICAL FIX: Stop image stream before disposal to prevent Surface.release errors
-        if (_cameraController!.value.isStreamingImages) {
-          try {
+        // CRITICAL FIX: Check if camera controller is already disposed before stopping stream
+        // This prevents calling stopImageStream() on a disposed controller
+        if (!_cameraController!.value.isInitialized) {
+          debugPrint(
+              'CameraService: Camera controller already disposed, skipping disposal');
+          _cameraController = null;
+          return;
+        }
+
+        // CRITICAL FIX: ALWAYS stop image stream before disposal, even if already stopped
+        // This ensures camera is fully stopped before controller is disposed
+        try {
+          if (_cameraController!.value.isStreamingImages) {
             await _cameraController!.stopImageStream();
             debugPrint('CameraService: Image stream stopped before disposal');
-          } catch (e) {
-            debugPrint('CameraService: Error stopping image stream: $e');
+          } else {
+            debugPrint(
+                'CameraService: Image stream already stopped, proceeding to dispose');
           }
+        } catch (e) {
+          debugPrint('CameraService: Error stopping image stream: $e');
         }
 
         // CRITICAL FIX: Add delay before disposal to allow proper resource cleanup
         await Future.delayed(Duration(milliseconds: 100));
 
+        // CRITICAL FIX: ALWAYS dispose camera controller to turn off hardware
+        // This prevents camera from remaining active after stopping detection
         await _cameraController!.dispose();
         _cameraController = null;
-        debugPrint('CameraService: Camera controller disposed');
+        debugPrint('CameraService: Camera controller disposed (hardware off)');
         _emitState(const CameraState._(CameraStateType.disposed));
       }
     } catch (e) {
@@ -329,131 +361,37 @@ class CameraService {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        // CRITICAL FIX: Handle unbounded constraints
+        // If constraints are unbounded (maxWidth or maxHeight is infinite),
+        // use AspectRatio widget instead of FittedBox
+        if (constraints.maxWidth == double.infinity ||
+            constraints.maxHeight == double.infinity) {
+          debugPrint(
+              'Container has unbounded constraints, using AspectRatio widget');
+
+          // Use AspectRatio widget to maintain camera's aspect ratio
+          // This works even with unbounded constraints
+          return AspectRatio(
+            aspectRatio: cameraAspectRatio,
+            child: CameraPreview(_cameraController!),
+          );
+        }
+
         final containerAspectRatio =
             constraints.maxWidth / constraints.maxHeight;
         debugPrint('Container aspect ratio: $containerAspectRatio');
         debugPrint('Camera aspect ratio: $cameraAspectRatio');
 
-        // Use the camera's native aspect ratio to prevent stretching
-        // The FittedBox with BoxFit.contain ensures the video maintains its aspect ratio
-        return AspectRatio(
-          aspectRatio: cameraAspectRatio,
-          child: FittedBox(
-            fit: BoxFit.contain, // Maintains aspect ratio, may add letterboxing
-            alignment: Alignment.center,
-            child: SizedBox(
-              width: previewSize.width.toDouble(),
-              height: previewSize.height.toDouble(),
-              child: CameraPreview(_cameraController!),
-            ),
-          ),
+        // Use FittedBox with BoxFit.contain to maintain aspect ratio
+        // This allows camera preview to fill available space naturally
+        // while maintaining its native aspect ratio and preventing stretching
+        return FittedBox(
+          fit: BoxFit.contain, // Maintains aspect ratio, may add letterboxing
+          alignment: Alignment.center,
+          child: CameraPreview(_cameraController!),
         );
       },
     );
-
-    /// Get camera preview widget with multiple layout options
-    Widget buildPreviewAdvanced({BoxFit fit = BoxFit.contain}) {
-      if (!isInitialized || _cameraController == null) {
-        return _buildPlaceholder();
-      }
-
-      final previewSize = _cameraController!.value.previewSize;
-      if (previewSize == null) {
-        return _buildPlaceholder();
-      }
-
-      // OPTION 2: Dynamic Aspect Ratio Matching
-      // This version adapts to different container sizes
-      final aspectRatio = previewSize.width / previewSize.height;
-
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final containerWidth = constraints.maxWidth;
-          final containerHeight = constraints.maxHeight;
-          final containerAspectRatio = containerWidth / containerHeight;
-
-          // If container aspect ratio is very different from camera aspect ratio,
-          // use the container's aspect ratio to prevent extreme stretching
-          final targetAspectRatio =
-              (containerAspectRatio - aspectRatio).abs() > 0.5
-                  ? containerAspectRatio
-                  : aspectRatio;
-
-          return AspectRatio(
-            aspectRatio: targetAspectRatio,
-            child: FittedBox(
-              fit: fit, // Flexible fit parameter
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: previewSize.width.toDouble(),
-                height: previewSize.height.toDouble(),
-                child: CameraPreview(_cameraController!),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    /// Get camera preview widget with fixed aspect ratio options
-    Widget buildPreviewWithFixedRatio(
-        {required double aspectRatio, BoxFit fit = BoxFit.contain}) {
-      if (!isInitialized || _cameraController == null) {
-        return _buildPlaceholder();
-      }
-
-      final previewSize = _cameraController!.value.previewSize;
-      if (previewSize == null) {
-        return _buildPlaceholder();
-      }
-
-      // OPTION 3: Standardized Container Ratios - Fixed aspect ratio
-      return AspectRatio(
-        aspectRatio: aspectRatio,
-        child: FittedBox(
-          fit: fit,
-          alignment: Alignment.center,
-          child: SizedBox(
-            width: previewSize.width.toDouble(),
-            height: previewSize.height.toDouble(),
-            child: CameraPreview(_cameraController!),
-          ),
-        ),
-      );
-    }
-
-    /// Legacy method for backward compatibility
-    Widget buildPreviewLegacy() {
-      return buildPreview();
-    }
-
-    /// Original buildPreview method for comparison
-    Widget buildPreviewOriginal() {
-      if (!isInitialized || _cameraController == null) {
-        return _buildPlaceholder();
-      }
-
-      final previewSize = _cameraController!.value.previewSize;
-      if (previewSize == null) {
-        return _buildPlaceholder();
-      }
-
-      // Original implementation with BoxFit.cover
-      final aspectRatio = previewSize.width / previewSize.height;
-
-      return AspectRatio(
-        aspectRatio: aspectRatio,
-        child: FittedBox(
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          child: SizedBox(
-            width: previewSize.width.toDouble(),
-            height: previewSize.height.toDouble(),
-            child: CameraPreview(_cameraController!),
-          ),
-        ),
-      );
-    }
   }
 
   /// Build placeholder when camera is not available

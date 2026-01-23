@@ -7,7 +7,6 @@ import '../blocs/bluetooth_cubit.dart';
 import '../models/detection_result.dart';
 import '../services/camera_service.dart';
 import 'dart:async';
-import 'dart:async';
 
 class VideoScreen extends StatefulWidget {
   const VideoScreen({super.key});
@@ -17,16 +16,24 @@ class VideoScreen extends StatefulWidget {
 }
 
 class _VideoScreenState extends State<VideoScreen> {
-  bool _isDetectionActive = false;
   CameraService? _cameraService;
   StreamSubscription<CameraState>? _cameraStateSubscription;
+  StreamSubscription<DetectionState>? _detectionStateSubscription;
   ScaffoldMessengerState? _scaffoldMessenger;
-  bool _isCameraServiceReady = false;
 
   @override
   void initState() {
     super.initState();
     _initializeCameraService();
+
+    // CRITICAL FIX: Check camera state immediately and after delay
+    // This ensures video screen detects camera if already initialized from dashboard
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkCameraState();
+    });
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _checkCameraState();
+    });
   }
 
   @override
@@ -34,6 +41,11 @@ class _VideoScreenState extends State<VideoScreen> {
     super.didChangeDependencies();
     // Save reference to ScaffoldMessenger for safe use in dispose()
     _scaffoldMessenger = ScaffoldMessenger.of(context);
+    // CRITICAL FIX: Check camera state when dependencies change
+    // This ensures video screen detects camera when navigating from dashboard
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkCameraState();
+    });
   }
 
   Future<void> _initializeCameraService() async {
@@ -52,16 +64,41 @@ class _VideoScreenState extends State<VideoScreen> {
         }
       });
 
-      // Mark camera service as ready
-      setState(() {
-        _isCameraServiceReady = true;
+      // CRITICAL FIX: Listen to DetectionCubit state to trigger UI updates
+      // This ensures video screen updates when detection state changes
+      _detectionStateSubscription =
+          context.read<DetectionCubit>().stream.listen((state) {
+        if (mounted) {
+          setState(() {
+            // Trigger UI update when state changes
+          });
+        }
       });
     } catch (e) {
       debugPrint('Failed to access camera service: $e');
-      // Keep _cameraService as null, UI will handle this gracefully
+    }
+  }
+
+  void _checkCameraState() {
+    debugPrint('VideoScreen._checkCameraState() called');
+    debugPrint('VideoScreen: mounted=$mounted');
+    debugPrint(
+        'VideoScreen: _cameraService=${_cameraService != null ? "initialized" : "null"}');
+    debugPrint(
+        'VideoScreen: isServiceInitialized=${_cameraService?.isServiceInitialized ?? false}');
+    debugPrint(
+        'VideoScreen: isInitialized=${_cameraService?.isInitialized ?? false}');
+    debugPrint(
+        'VideoScreen: controller=${_cameraService?.controller != null ? "exists" : "null"}');
+
+    if (mounted && _cameraService != null && _cameraService!.isInitialized) {
+      debugPrint('VideoScreen: Camera already initialized, updating UI');
       setState(() {
-        _isCameraServiceReady = true; // Still mark as ready to show error state
+        // Force UI update to show camera preview
       });
+    } else {
+      debugPrint(
+          'VideoScreen: Camera not initialized, will initialize on demand');
     }
   }
 
@@ -74,9 +111,16 @@ class _VideoScreenState extends State<VideoScreen> {
         throw Exception('Camera service not initialized');
       }
 
-      // Always initialize camera to ensure it's ready
-      // This handles both new initialization and re-initialization
-      await _cameraService!.initializeCamera(resolution: ResolutionPreset.high);
+      // CRITICAL FIX: Only initialize camera if it's not already initialized
+      // This prevents re-initialization when navigating from dashboard,
+      // which causes app to freeze
+      if (!_cameraService!.isInitialized) {
+        debugPrint('Camera not initialized, initializing...');
+        await _cameraService!
+            .initializeCamera(resolution: ResolutionPreset.high);
+      } else {
+        debugPrint('Camera already initialized, skipping re-initialization');
+      }
 
       // Set camera controller in detection service
       if (_cameraService!.controller != null) {
@@ -100,7 +144,8 @@ class _VideoScreenState extends State<VideoScreen> {
   }
 
   Future<void> _toggleDetection() async {
-    if (_isDetectionActive) {
+    final state = context.read<DetectionCubit>().state;
+    if (state is DetectionRunning || state is DetectionResultUpdated) {
       await _stopDetection();
     } else {
       await _startDetection();
@@ -108,6 +153,8 @@ class _VideoScreenState extends State<VideoScreen> {
   }
 
   Future<void> _startDetection() async {
+    // CRITICAL FIX: Always ensure camera is initialized before starting detection
+    // This fixes the issue where detection doesn't start after being stopped
     if (_cameraService == null ||
         !_cameraService!.isInitialized ||
         _cameraService!.controller == null) {
@@ -115,13 +162,19 @@ class _VideoScreenState extends State<VideoScreen> {
       await _initializeCamera();
     }
 
+    // CRITICAL FIX: Always re-set camera controller in DetectionService when starting detection
+    // This ensures DetectionService has the camera reference even after being stopped
+    if (_cameraService!.controller != null) {
+      await context
+          .read<DetectionCubit>()
+          .setCameraController(_cameraService!.controller!);
+      debugPrint(
+          'Camera controller re-set in detection service for detection restart');
+    }
+
     try {
       // Start detection service
       await context.read<DetectionCubit>().startDetection();
-
-      setState(() {
-        _isDetectionActive = true;
-      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,9 +192,12 @@ class _VideoScreenState extends State<VideoScreen> {
       // Stop detection service
       await context.read<DetectionCubit>().stopDetection();
 
-      setState(() {
-        _isDetectionActive = false;
-      });
+      // CRITICAL FIX: Actually stop camera hardware when stopping detection
+      // This turns off the camera, not just hides the video feed
+      if (_cameraService != null && _cameraService!.controller != null) {
+        await _cameraService!.disposeCamera();
+        debugPrint('VideoScreen: Camera disposed (hardware off)');
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -158,12 +214,6 @@ class _VideoScreenState extends State<VideoScreen> {
     try {
       // Stop detection service
       await context.read<DetectionCubit>().stopDetection();
-
-      if (mounted) {
-        setState(() {
-          _isDetectionActive = false;
-        });
-      }
     } catch (e) {
       // Don't show snackbar during disposal to avoid widget tree lock error
       debugPrint('Failed to stop detection: $e');
@@ -174,11 +224,19 @@ class _VideoScreenState extends State<VideoScreen> {
   void dispose() {
     _stopDetectionSafely();
     _cameraStateSubscription?.cancel();
+    _detectionStateSubscription?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+        'VideoScreen.build() called - this should always appear when navigating to video screen');
+    debugPrint(
+        'VideoScreen: _cameraService=${_cameraService != null ? "exists" : "null"}');
+    debugPrint(
+        'VideoScreen: isInitialized=${_cameraService?.isInitialized ?? false}');
+
     return Scaffold(
       backgroundColor: const Color(0xFF1A1B2E),
       appBar: AppBar(
@@ -193,95 +251,43 @@ class _VideoScreenState extends State<VideoScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          IconButton(
-            icon: Icon(
-              _isDetectionActive ? Icons.stop : Icons.play_arrow,
-              color: _isDetectionActive ? Colors.red : Colors.green,
-            ),
-            onPressed: _toggleDetection,
+          BlocBuilder<DetectionCubit, DetectionState>(
+            builder: (context, state) {
+              final isActive =
+                  state is DetectionRunning || state is DetectionResultUpdated;
+              return IconButton(
+                icon: Icon(
+                  isActive ? Icons.stop : Icons.play_arrow,
+                  color: isActive ? Colors.red : Colors.green,
+                ),
+                onPressed: _toggleDetection,
+              );
+            },
           ),
         ],
       ),
       body: Column(
         children: [
-          // Camera Preview Section - OPTION 3: Standardized Container Ratio
+          // Camera Preview Section - Uses camera's native aspect ratio
           Expanded(
-            flex: 3,
+            flex: 4,
             child: Container(
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFF2D3250),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _isDetectionActive
-                      ? Colors.green
-                      : const Color(0xFFFFD700),
+                  color: Colors
+                      .green, // Always show green border when camera is active
                   width: 2,
                 ),
               ),
-              child: AspectRatio(
-                aspectRatio:
-                    16 / 9, // Standardized 16:9 aspect ratio for consistency
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: _buildCameraPreview(),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: _buildCameraPreview(),
               ),
             ),
           ),
-
-          // Alternative container options for testing (commented out)
-          // To test different aspect ratios, uncomment one of the following:
-
-          // 4:3 Aspect Ratio Option
-          /*
-          Expanded(
-            flex: 3,
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D3250),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFF00CED1),
-                  width: 2,
-                ),
-              ),
-              child: AspectRatio(
-                aspectRatio: 4/3, // 4:3 aspect ratio
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: _buildCameraPreview(),
-                ),
-              ),
-            ),
-          ),
-          */
-
-          // 1:1 Aspect Ratio Option (square)
-          /*
-          Expanded(
-            flex: 3,
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D3250),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFFFF69B4),
-                  width: 2,
-                ),
-              ),
-              child: AspectRatio(
-                aspectRatio: 1.0, // 1:1 square aspect ratio
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: _buildCameraPreview(),
-                ),
-              ),
-            ),
-          ),
-          */
 
           // Detection Status Section
           Expanded(
@@ -320,36 +326,39 @@ class _VideoScreenState extends State<VideoScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: _toggleDetection,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          _isDetectionActive ? Colors.red : Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _isDetectionActive ? Icons.stop : Icons.play_arrow,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _isDetectionActive
-                              ? 'Stop Detection'
-                              : 'Start Detection',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                  child: BlocBuilder<DetectionCubit, DetectionState>(
+                    builder: (context, state) {
+                      final isActive = state is DetectionRunning ||
+                          state is DetectionResultUpdated;
+                      return ElevatedButton(
+                        onPressed: _toggleDetection,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isActive ? Colors.red : Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isActive ? Icons.stop : Icons.play_arrow,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isActive ? 'Stop Detection' : 'Start Detection',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -391,44 +400,91 @@ class _VideoScreenState extends State<VideoScreen> {
   }
 
   Widget _buildCameraPreview() {
-    if (_cameraService != null && _cameraService!.isInitialized) {
-      return Stack(
-        children: [
-          _cameraService!.buildPreview(),
-          // Detection overlay
-          if (_isDetectionActive)
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.green.withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: const SizedBox.shrink(),
-              ),
-            ),
-        ],
-      );
+    // CRITICAL FIX: Only show camera preview when detection is ACTIVE
+    // This ensures camera turns off when detection is stopped
+    final detectionState = context.read<DetectionCubit>().state;
+    final isDetectionActive = detectionState is DetectionRunning ||
+        detectionState is DetectionResultUpdated;
+    final isServiceReady = _cameraService?.isServiceInitialized ?? false;
+    final isCameraReady = _cameraService?.isInitialized ?? false;
+    final hasController = _cameraService?.controller != null;
+
+    debugPrint(
+        'VideoScreen._buildCameraPreview: isDetectionActive=$isDetectionActive, isServiceReady=$isServiceReady, isCameraReady=$isCameraReady, hasController=$hasController');
+
+    // Only show camera preview when detection is ACTIVE
+    // This ensures camera preview stops when detection is stopped
+    if (isDetectionActive &&
+        _cameraService != null &&
+        _cameraService!.isInitialized &&
+        _cameraService!.controller != null) {
+      final previewSize = _cameraService!.controller!.value.previewSize;
+      debugPrint(
+          'VideoScreen: Detection active, showing camera preview directly');
+      debugPrint('VideoScreen: Controller previewSize: $previewSize');
+
+      // Let CameraPreview fill container naturally
+      // This ensures video feed fills entire available space
+      return CameraPreview(_cameraService!.controller!);
     } else {
+      // Camera not ready or detection not active - show status
+      String statusText;
+      IconData statusIcon;
+
+      if (!isDetectionActive) {
+        statusText = 'Detection Inactive - Camera Off';
+        statusIcon = Icons.videocam_off;
+        debugPrint(
+            'VideoScreen: Detection not active, showing camera off status');
+      } else if (_cameraService == null) {
+        statusText = 'Camera service not ready';
+        statusIcon = Icons.hourglass_empty;
+        debugPrint('VideoScreen: Camera service is null');
+      } else if (!_cameraService!.isServiceInitialized) {
+        statusText = 'Camera service not initialized';
+        statusIcon = Icons.hourglass_empty;
+        debugPrint('VideoScreen: Camera service not initialized');
+      } else if (!_cameraService!.isInitialized) {
+        statusText = 'Camera not initialized';
+        statusIcon = Icons.camera_alt;
+        debugPrint('VideoScreen: Camera not initialized');
+      } else if (_cameraService!.controller == null) {
+        statusText = 'No camera controller';
+        statusIcon = Icons.error_outline;
+        debugPrint('VideoScreen: Camera controller is null');
+      } else {
+        statusText = 'Camera not ready';
+        statusIcon = Icons.videocam_off;
+        debugPrint('VideoScreen: Camera not ready (unknown reason)');
+      }
+
+      debugPrint('VideoScreen: Showing status: $statusText');
       return Container(
         color: Colors.black,
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.videocam_off,
+                statusIcon,
                 size: 64,
-                color: Color(0xFFFFD700),
+                color: const Color(0xFFFFD700),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
-                'Camera Initializing...',
-                style: TextStyle(
+                statusText,
+                style: const TextStyle(
                   color: Color(0xFFFFD700),
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Start detection to initialize camera',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -481,42 +537,51 @@ class _VideoScreenState extends State<VideoScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: statusColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: statusColor.withOpacity(0.3)),
       ),
-      child: Row(
-        children: [
-          Icon(statusIcon, color: statusColor, size: 32),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (state is DetectionResultUpdated) ...[
-                  const SizedBox(height: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(statusIcon, color: statusColor, size: 28),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    'Confidence: ${(state.result.confidence * 100).toStringAsFixed(1)}%',
+                    statusText,
                     style: TextStyle(
-                      color: statusColor.withOpacity(0.8),
-                      fontSize: 12,
+                      color: statusColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (state is DetectionResultUpdated) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Confidence: ${(state.result.confidence * 100).toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        color: statusColor.withOpacity(0.8),
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

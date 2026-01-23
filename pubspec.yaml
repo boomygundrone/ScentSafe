@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -49,11 +51,11 @@ dependencies:
   # Bluetooth connectivity
   # flutter_blue_plus: ^1.31.0  # Temporarily commented out for Android testing
 
-  # Firebase Integration - FULLY ENABLED
-  firebase_core: ^3.3.0
-  firebase_auth: ^5.1.2
-  cloud_firestore: ^5.6.12
-  firebase_database: ^11.0.2
+  # Firebase Integration - TEMPORARILY DISABLED FOR BUILD
+  # firebase_core: ^3.3.0
+  # firebase_auth: ^5.1.2
+  # cloud_firestore: ^5.6.12
+  # firebase_database: ^11.0.2
 
   # Local storage
   shared_preferences: ^2.3.2
@@ -61,28 +63,31 @@ dependencies:
 
   # UI components
   provider: ^6.1.2
-  intl: ^0.19.0
-
+  intl: ^0.20.2
+  
+  # Internationalization
+  # easy_localization: ^3.0.7
+  
   # ML Kit for face detection
   google_ml_kit: ^0.20.0
   
-  # CRITICAL: Add missing audio dependency
-  audioplayers: ^6.1.0
+  # CRITICAL: Add missing audio dependency (macOS compatible)
+  # audioplayers_darwin: ^6.1.0
   
   # Add permission handling
   permission_handler: ^11.3.1
   
-  # Add device info for platform-specific optimizations
-  device_info_plus: ^10.1.2
+  # Add device info for platform-specific optimizations (macOS compatible)
+  # device_info_plus: ^10.1.2
   
-  # Add battery optimization
-  battery_plus: ^6.0.2
+  # Add battery optimization (macOS compatible)
+  # battery_plus: ^6.0.2
   
-  # Add secure storage
-  flutter_secure_storage: ^9.2.2
+  # Add secure storage (macOS compatible)
+  # flutter_secure_storage: ^9.2.2
   
   # Add crypto for security
-  crypto: ^3.0.3
+  # crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
@@ -111,6 +116,7 @@ flutter:
     - assets/images/
     - assets/firebase/
     - assets/audio/  # Add audio assets
+    - assets/translations/  # Add translation assets
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

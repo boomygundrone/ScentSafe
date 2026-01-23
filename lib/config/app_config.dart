@@ -1,12 +1,12 @@
 /// Centralized application configuration management
 /// Extracts all magic numbers and settings for better maintainability
 class AppConfig {
-  // Camera Configuration - CRITICAL FIX: Reduced resolution for memory optimization
+  // Camera Configuration - Optimized resolution for better performance
   // Landscape resolution (default)
   static const int cameraResolutionWidthLandscape = 640;
-  static const int cameraResolutionHeightLandscape = 360;
-  // Portrait resolution for vertical orientation
-  static const int cameraResolutionWidthPortrait = 360;
+  static const int cameraResolutionHeightLandscape = 480;
+  // Portrait resolution for vertical orientation (4:3 aspect ratio)
+  static const int cameraResolutionWidthPortrait = 480;
   static const int cameraResolutionHeightPortrait = 640;
   // Legacy properties for backward compatibility
   static const int cameraResolutionWidth = cameraResolutionWidthLandscape;

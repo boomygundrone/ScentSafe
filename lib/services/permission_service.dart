@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 class PermissionService {
   static PermissionService? _instance;
@@ -72,16 +71,7 @@ class PermissionService {
 
   /// Open app settings
   Future<void> openAppSettings() async {
-    await openAppSettings(); // Call the global function from permission_handler
-  }
-
-  /// Get Android SDK version for conditional permissions
-  Future<int> getAndroidSdkVersion() async {
-    if (!kIsWeb) {
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
-      return androidInfo.version.sdkInt;
-    }
-    return 0;
+    await openAppSettings(); // Call to global function from permission_handler
   }
 
   /// Request permissions with explanation
@@ -98,33 +88,9 @@ class PermissionService {
       return statuses.values.every((status) => status.isGranted);
     }
 
-    // For Android 12+, need to handle Bluetooth permissions differently
-    final sdkVersion = await getAndroidSdkVersion();
-    if (sdkVersion >= 31) {
-      // Android 12+ specific handling
-      return await _requestAndroid12PlusPermissions();
-    }
-
     // Standard permission request for mobile
     final statuses = await requestAllPermissions();
     return statuses.values.every((status) => status.isGranted);
-  }
-
-  Future<bool> _requestAndroid12PlusPermissions() async {
-    // Handle Android 12+ Bluetooth permissions
-    final bluetoothStatuses = await [
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-    ].request();
-
-    final otherStatuses = await [
-      Permission.camera,
-      Permission.microphone,
-      Permission.storage,
-    ].request();
-
-    return [...bluetoothStatuses.values, ...otherStatuses.values]
-        .every((status) => status.isGranted);
   }
 
   /// Check if we're running on web platform

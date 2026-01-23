@@ -8,10 +8,20 @@ import 'dart:io' show Platform;
 import '../blocs/detection_cubit.dart';
 import '../blocs/bluetooth_cubit.dart';
 import '../blocs/auth_cubit.dart';
+import '../blocs/localization_cubit.dart';
 import '../models/detection_result.dart';
 import '../models/user.dart';
 import '../services/camera_service.dart';
+import '../services/app_localization_service.dart';
 import '../constants/layout_constants.dart';
+import '../widgets/language_switcher.dart';
+
+/// Extension for String localization
+extension StringLocalization on String {
+  String tr() {
+    return AppLocalizationService.instance.translate(this);
+  }
+}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,7 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isVideoActive = false;
   CameraService? _cameraService;
   StreamSubscription<CameraState>? _cameraStateSubscription;
-  bool _isCameraServiceReady = false;
+  DetectionCubit? _detectionCubit;
 
   @override
   void initState() {
@@ -33,89 +43,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _initializeCameraService();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Store reference to DetectionCubit for safe access in dispose
+    _detectionCubit = context.read<DetectionCubit>();
+  }
+
   Future<void> _initializeCameraService() async {
     try {
       // Camera service should already be initialized at app level
       _cameraService = CameraService.instance;
       debugPrint('Camera service instance acquired');
 
-      // CRITICAL FIX: Check if service is actually initialized before proceeding
-      if (!_cameraService!.isInitialized) {
-        debugPrint(
-            'Camera service not initialized, attempting to initialize...');
-        try {
-          await _cameraService!.initialize();
-          debugPrint('Camera service initialized successfully');
-        } catch (e) {
-          debugPrint('Camera service initialization failed: $e');
-          // Don't mark as ready if initialization failed
-          setState(() {
-            _isCameraServiceReady = true;
-          });
-          return;
-        }
-      }
-
-      // Listen to camera state changes after initialization
+      // Listen to camera state changes
       _cameraStateSubscription =
           _cameraService!.cameraStateStream.listen((state) {
-        if (mounted) {
+        if (mounted && _detectionCubit != null) {
           setState(() {
             // Update UI based on camera state
           });
         }
       });
-
-      // Mark camera service as ready only if initialization succeeded
-      setState(() {
-        _isCameraServiceReady = true;
-      });
     } catch (e) {
       debugPrint('Failed to access camera service: $e');
-      // Keep _cameraService as null, UI will handle this gracefully
-      setState(() {
-        _isCameraServiceReady = true; // Still mark as ready to show error state
-      });
     }
   }
 
   Future<void> _initializeCamera() async {
     try {
-      debugPrint('Initializing camera through camera service...');
+      debugPrint(
+          'DashboardScreen: Initializing camera through camera service...');
+      debugPrint(
+          'DashboardScreen: Camera service isServiceInitialized=${_cameraService?.isServiceInitialized ?? false}');
+      debugPrint(
+          'DashboardScreen: Camera service isInitialized=${_cameraService?.isInitialized ?? false}');
 
       if (_cameraService == null) {
         throw Exception('Camera service not initialized');
       }
 
       // CRITICAL FIX: Ensure service is initialized before initializing camera
-      if (!_cameraService!.isInitialized) {
+      if (!_cameraService!.isServiceInitialized) {
         debugPrint(
-            'Camera service not initialized, attempting service initialization...');
+            'DashboardScreen: Camera service not initialized, attempting service initialization...');
         try {
           await _cameraService!.initialize();
-          debugPrint('Camera service initialized successfully');
+          debugPrint(
+              'DashboardScreen: Camera service initialized successfully');
+          debugPrint(
+              'DashboardScreen: After init - isServiceInitialized=${_cameraService!.isServiceInitialized}, isInitialized=${_cameraService!.isInitialized}');
         } catch (e) {
-          debugPrint('Camera service initialization failed: $e');
+          debugPrint(
+              'DashboardScreen: Camera service initialization failed: $e');
           throw Exception('Failed to initialize camera service: $e');
         }
       }
 
       // Always initialize camera to ensure it's ready
       // This handles both new initialization and re-initialization
+      debugPrint('DashboardScreen: Calling initializeCamera...');
       await _cameraService!.initializeCamera();
+      debugPrint('DashboardScreen: Camera controller initialized');
+      debugPrint(
+          'DashboardScreen: After initializeCamera - isInitialized=${_cameraService!.isInitialized}');
 
       // Set camera controller in detection service after initialization
       if (_cameraService!.controller != null) {
         await context
             .read<DetectionCubit>()
             .setCameraController(_cameraService!.controller!);
-        debugPrint('Camera controller set in detection service');
+        debugPrint(
+            'DashboardScreen: Camera controller set in detection service');
+      } else {
+        debugPrint(
+            'DashboardScreen: WARNING - Camera controller is null after initialization');
+      }
+
+      // CRITICAL FIX: Set _isVideoActive to true after successful initialization
+      // This ensures the camera preview is displayed when camera is ready
+      if (mounted && _cameraService!.isInitialized) {
+        setState(() {
+          _isVideoActive = true;
+        });
+        debugPrint(
+            'DashboardScreen: Video feed activated after initialization');
       }
 
       // Always start detection loop after setting controller
       _startDetectionLoop();
     } catch (e) {
-      debugPrint('Camera initialization error: $e');
+      debugPrint('DashboardScreen: Camera initialization error: $e');
       rethrow;
     }
   }
@@ -125,10 +143,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // SIMPLIFIED APPROACH: Use centralized DetectionService instead of local timers
     // Start the centralized detection service which handles all timing
-    if (mounted) {
+    if (mounted && _detectionCubit != null) {
       // Note: Can't access private _detectionService, so we'll use the public methods
       // final detectionService = context.read<DetectionCubit>()._detectionService;
-      context.read<DetectionCubit>().startDetection();
+      _detectionCubit!.startDetection();
       debugPrint('Detection started via DetectionCubit');
     } else {
       debugPrint('Widget not mounted, cannot start detection');
@@ -139,10 +157,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     debugPrint('Stopping detection loop...');
 
     // SIMPLIFIED APPROACH: Stop centralized DetectionService
-    if (mounted) {
+    if (mounted && _detectionCubit != null) {
       // Note: Can't access private _detectionService, so we'll use the public methods
       // final detectionService = context.read<DetectionCubit>()._detectionService;
-      context.read<DetectionCubit>().stopDetection();
+      _detectionCubit!.stopDetection();
       debugPrint('Detection stopped via DetectionCubit');
     } else {
       debugPrint('Widget not mounted, cannot stop detection');
@@ -153,19 +171,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _stopDetectionLoop();
     _cameraStateSubscription?.cancel();
+    _detectionCubit = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     debugPrint(
-        '🏠 DashboardScreen.build() called - _isCameraServiceReady=$_isCameraServiceReady');
+        '🏠 DashboardScreen.build() called - cameraService.isServiceInitialized=${_cameraService?.isServiceInitialized ?? false}');
 
     // Show loading screen while camera service is initializing
-    if (!_isCameraServiceReady) {
+    // CRITICAL FIX: Use isServiceInitialized instead of isInitialized to allow UI to load
+    // isInitialized requires camera controller to be ready, but the dashboard should
+    // load even when camera is off (controller is null)
+    if (_cameraService == null || !_cameraService!.isServiceInitialized) {
       debugPrint('📸 Camera service not ready, showing loading screen');
       return Scaffold(
         backgroundColor: const Color(0xFF1A1B2E),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1A1B2E),
+          elevation: 0,
+          title: Text(
+            'app_name'.tr(),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: LanguageToggleButton(
+                iconColor: Colors.white,
+                iconSize: 20,
+              ),
+            ),
+          ],
+        ),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -195,247 +235,252 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1B2E),
         elevation: 0,
-        title: const Text(
-          'ScentSafe',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          'app_name'.tr(),
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: LanguageToggleButton(
+              iconColor: Colors.white,
+              iconSize: 20,
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // User Profile Section (simplified)
-              BlocBuilder<AuthCubit, AuthState>(
-                builder: (context, authState) {
-                  String userName = 'Marcus';
+      body: BlocBuilder<LocalizationCubit, Locale>(
+        builder: (context, locale) {
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User Profile Section (simplified)
+                  BlocBuilder<AuthCubit, AuthState>(
+                    builder: (context, authState) {
+                      String userName = 'Marcus';
 
-                  if (authState is AuthAuthenticated) {
-                    userName = authState.user.name;
-                  }
-                  return Container(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 10.0),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 10.0),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2D3250),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        // Profile Picture
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1B2E),
-                            shape: BoxShape.circle,
-                            image: DecorationImage(
-                              image: AssetImage('images/profile_avatar.png'),
-                              fit: BoxFit.cover,
+                      if (authState is AuthAuthenticated) {
+                        userName = authState.user.name;
+                      }
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 10.0),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 10.0),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2D3250),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        // Greeting Text
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Hello $userName,',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
+                        child: Row(
+                          children: [
+                            // Profile Picture
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A1B2E),
+                                shape: BoxShape.circle,
+                                image: DecorationImage(
+                                  image:
+                                      AssetImage('images/profile_avatar.png'),
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                              const Text(
-                                'Welcome!!',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              LayoutConstants.sectionSpacer,
-
-              // Video Section - Always show camera container
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 10.0),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2D3250),
-                    borderRadius: BorderRadius.circular(16),
-                    border:
-                        Border.all(color: const Color(0xFFFFD700), width: 2),
-                  ),
-                  child: Container(
-                    constraints: BoxConstraints(
-                      minHeight: MediaQuery.of(context).orientation ==
-                              Orientation.portrait
-                          ? 240 // Minimum height for portrait mode (4:3 ratio)
-                          : 180, // Minimum height for landscape mode (4:3 ratio)
-                      maxHeight: MediaQuery.of(context).orientation ==
-                              Orientation.portrait
-                          ? 320 // Maximum height for portrait mode (4:3 ratio)
-                          : 240, // Maximum height for landscape mode (4:3 ratio)
-                    ),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child:
-                              _buildCameraPreview(), // Uses camera's native aspect ratio
-                        ),
-                        // Tap to open full screen overlay - only show when camera is active
-                        if (_isVideoActive)
-                          Positioned(
-                            bottom: 16,
-                            right: 16,
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/video');
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.fullscreen,
-                                      color: Color(0xFFFFD700),
-                                      size: 16,
+                            ),
+                            const SizedBox(width: 16),
+                            // Greeting Text
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${'hello'.tr()} $userName,',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
                                     ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Tap to expand',
-                                      style: TextStyle(
-                                        color: Color(0xFFFFD700),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                                  ),
+                                  Text(
+                                    'welcome'.tr(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
+                  LayoutConstants.sectionSpacer,
+
+                  // Video Section - Always show camera container
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 10.0),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2D3250),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: const Color(0xFFFFD700), width: 2),
+                      ),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child:
+                                _buildCameraPreview(), // Uses camera's native aspect ratio
+                          ),
+                          // Tap to open full screen overlay - only show when camera is active
+                          if (_isVideoActive)
+                            Positioned(
+                              bottom: 16,
+                              right: 16,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).pushNamed('/video');
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.fullscreen,
+                                        color: const Color(0xFFFFD700),
+                                        size: 16,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'tap_to_expand'.tr(),
+                                        style: TextStyle(
+                                          color: const Color(0xFFFFD700),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              // Alternative camera container options for testing (commented out)
-              // To test different aspect ratios, uncomment one of the following:
+                  LayoutConstants.sectionSpacer,
 
-              // 4:3 Aspect Ratio Option (more square, like many cameras)
-              /*
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2D3250),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Color(0xFF00CED1), width: 2),
-                ),
-                child: AspectRatio(
-                  aspectRatio: 4/3, // 4:3 aspect ratio
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: _buildCameraPreview(),
-                      ),
-                    ],
+                  // Awakeness Level Section
+                  BlocBuilder<DetectionCubit, DetectionState>(
+                    builder: (context, state) {
+                      String levelText;
+                      String additionalInfo = '';
+
+                      if (state is DetectionResultUpdated) {
+                        switch (state.result.level) {
+                          case DrowsinessLevel.alert:
+                            levelText = 'alert'.tr();
+                            break;
+                          case DrowsinessLevel.mildFatigue:
+                            levelText = 'mild_fatigue'.tr();
+                            break;
+                          case DrowsinessLevel.moderateFatigue:
+                            levelText = 'moderate_fatigue'.tr();
+                            break;
+                          case DrowsinessLevel.severeFatigue:
+                            levelText = 'severe_fatigue'.tr();
+                            break;
+                        }
+
+                        // Display additional detection metrics
+                        additionalInfo =
+                            'EAR: ${state.result.averageEAR?.toStringAsFixed(2) ?? 'N/A'} | '
+                            'Blinks: ${state.result.blinkCount} | '
+                            'Yawns: ${state.result.yawnCount} | '
+                            'Head Tilt: ${state.result.headTilt?.toStringAsFixed(1) ?? 'N/A'}° | '
+                            'Audio Alert: ${state.result.level == DrowsinessLevel.moderateFatigue || state.result.level == DrowsinessLevel.severeFatigue ? 'Active' : 'Inactive'}';
+                      } else {
+                        levelText = 'initializing'.tr();
+                      }
+
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 10.0),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 10.0),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF2563EB), // Blue start
+                              Color(0xFF1E293B), // Dark blue end
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF2563EB).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              'awakeness_level'.tr(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              levelText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ),
-              */
 
-              // 1:1 Aspect Ratio Option (square format)
-              /*
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2D3250),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Color(0xFFFF69B4), width: 2),
-                ),
-                child: AspectRatio(
-                  aspectRatio: 1.0, // 1:1 square aspect ratio
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: _buildCameraPreview(),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              */
+                  LayoutConstants.sectionSpacer,
 
-              LayoutConstants.sectionSpacer,
-
-              // Awakeness Level Section
-              BlocBuilder<DetectionCubit, DetectionState>(
-                builder: (context, state) {
-                  String levelText;
-                  String additionalInfo = '';
-
-                  if (state is DetectionResultUpdated) {
-                    switch (state.result.level) {
-                      case DrowsinessLevel.alert:
-                        levelText = 'Alert';
-                        break;
-                      case DrowsinessLevel.mildFatigue:
-                        levelText = 'Mild Fatigue';
-                        break;
-                      case DrowsinessLevel.moderateFatigue:
-                        levelText = 'Moderate Fatigue';
-                        break;
-                      case DrowsinessLevel.severeFatigue:
-                        levelText = 'Severe Fatigue';
-                        break;
-                    }
-
-                    // Display additional detection metrics
-                    additionalInfo =
-                        'EAR: ${state.result.averageEAR?.toStringAsFixed(2) ?? 'N/A'} | '
-                        'Blinks: ${state.result.blinkCount} | '
-                        'Yawns: ${state.result.yawnCount} | '
-                        'Head Tilt: ${state.result.headTilt?.toStringAsFixed(1) ?? 'N/A'}° | '
-                        'Audio Alert: ${state.result.level == DrowsinessLevel.moderateFatigue || state.result.level == DrowsinessLevel.severeFatigue ? 'Active' : 'Inactive'}';
-                  } else {
-                    levelText = 'Initializing...';
-                  }
-
-                  return Container(
+                  // Aroma Section
+                  Container(
                     width: double.infinity,
                     margin: const EdgeInsets.symmetric(
                         horizontal: 16.0, vertical: 10.0),
@@ -453,170 +498,119 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2563EB).withOpacity(0.3),
+                          color: Colors.black.withOpacity(0.1),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Awakeness Level',
+                          'current_scent'.tr(),
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            fontSize: 14,
                           ),
                         ),
-                        Text(
-                          levelText,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              LayoutConstants.sectionSpacer,
-
-              // Aroma Section
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 10.0),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 10.0),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF2563EB), // Blue start
-                      Color(0xFF1E293B), // Dark blue end
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Current Scent',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Lavender Relax',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              LayoutConstants.sectionSpacer,
-
-              // Voice Pack Section
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 10.0),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 10.0),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF2563EB), // Blue start
-                      Color(0xFF1E293B), // Dark blue end
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Voice Pack Section Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
+                        const SizedBox(height: 4),
                         const Text(
-                          'Voice Pack',
+                          'Lavender Relax',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            // Navigate to view all voice packs
-                          },
-                          child: const Text(
-                            'view all',
-                            style: TextStyle(
-                              color: Color(0xFFFFD700),
-                              fontSize: 14,
-                            ),
                           ),
                         ),
                       ],
                     ),
+                  ),
 
-                    const SizedBox(height: 16),
+                  LayoutConstants.sectionSpacer,
 
-                    // Voice Pack Cards - Horizontal Scrollable Row
-                    SizedBox(
-                      height: 120,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _buildVoicePackCard(
-                              'Ado', 'HKD 50', 'images/voice_pack_ado.png'),
-                          const SizedBox(width: 16),
-                          _buildVoicePackCard(
-                              'Luna', 'Free', 'images/profile_avatar.png'),
-                          const SizedBox(width: 16),
-                          _buildVoicePackCard(
-                              'Echo', 'HKD 30', 'images/bb8.jpeg'),
+                  // Voice Pack Section
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 10.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 10.0),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF2563EB), // Blue start
+                          Color(0xFF1E293B), // Dark blue end
                         ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Voice Pack Section Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'voice_pack'.tr(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                // Navigate to view all voice packs
+                              },
+                              child: Text(
+                                'view_all'.tr(),
+                                style: const TextStyle(
+                                  color: Color(0xFFFFD700),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Voice Pack Cards - Horizontal Scrollable Row
+                        SizedBox(
+                          height: 120,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              _buildVoicePackCard(
+                                  'Ado', 'HKD 50', 'images/voice_pack_ado.png'),
+                              const SizedBox(width: 16),
+                              _buildVoicePackCard(
+                                  'Luna', 'Free', 'images/profile_avatar.png'),
+                              const SizedBox(width: 16),
+                              _buildVoicePackCard(
+                                  'Echo', 'HKD 30', 'images/bb8.jpeg'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -641,8 +635,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(_isVideoActive
-                      ? 'Stopping camera...'
-                      : 'Starting camera...'),
+                      ? 'stopping_camera'.tr()
+                      : 'starting_camera'.tr()),
                   backgroundColor: _isVideoActive ? Colors.red : Colors.green,
                   duration: const Duration(seconds: 1),
                 ),
@@ -656,7 +650,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 // Dispose camera through camera service
                 await _cameraService?.disposeCamera();
 
-                if (mounted) {
+                if (mounted && _detectionCubit != null) {
                   setState(() {
                     _isVideoActive = false;
                   });
@@ -670,6 +664,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   await _initializeCamera();
 
                   // Only update state after successful initialization
+                  // CRITICAL FIX: Use isInitialized here to ensure camera controller is ready
                   if (mounted &&
                       _cameraService != null &&
                       _cameraService!.isInitialized) {
@@ -679,14 +674,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   }
                 } catch (e) {
                   debugPrint('Error initializing camera: $e');
-                  if (mounted) {
+                  if (mounted && _detectionCubit != null) {
                     setState(() {
                       _isVideoActive = false;
                     });
                   }
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Failed to initialize camera: $e'),
+                      content:
+                          Text('${'failed_to_initialize_camera'.tr()}: $e'),
                       backgroundColor: Colors.red,
                       duration: const Duration(seconds: 3),
                     ),
@@ -760,7 +756,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onTap: () {
         // Handle voice pack selection
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Selected $name voice pack')),
+          SnackBar(content: Text('${'selected_voice_pack'.tr()} $name')),
         );
       },
       child: Container(
@@ -827,23 +823,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildCameraPreview() {
     // Use centralized camera service for preview
-    debugPrint(
-        '_buildCameraPreview called: _isVideoActive=$_isVideoActive, cameraService.isInitialized=${_cameraService?.isInitialized ?? false}');
+    final isServiceReady = _cameraService?.isServiceInitialized ?? false;
+    final isCameraReady = _cameraService?.isInitialized ?? false;
+    final hasController = _cameraService?.controller != null;
 
+    debugPrint(
+        '_buildCameraPreview called: _isVideoActive=$_isVideoActive, isServiceReady=$isServiceReady, isCameraReady=$isCameraReady, hasController=$hasController');
+
+    // CRITICAL FIX: Use isInitialized here because we need the actual camera controller
+    // to display the preview, not just the service being ready
     if (_cameraService != null && _cameraService!.isInitialized) {
-      debugPrint('Returning CameraPreview widget from camera service');
+      debugPrint(
+          'DashboardScreen: Camera is ready, returning CameraPreview widget from camera service');
       return _cameraService!.buildPreview();
     } else {
-      String statusText = 'Camera Off';
+      String statusText = 'camera_off'.tr();
       IconData statusIcon = Icons.videocam_off;
 
-      if (_isVideoActive &&
-          (_cameraService == null || !_cameraService!.isInitialized)) {
-        statusText = 'Initializing...';
-        statusIcon = Icons.hourglass_empty;
+      if (_isVideoActive) {
+        if (!isServiceReady) {
+          statusText = 'initializing_service'.tr();
+          statusIcon = Icons.hourglass_empty;
+          debugPrint('DashboardScreen: Video active but service not ready');
+        } else if (!isCameraReady) {
+          statusText = 'initializing_camera'.tr();
+          statusIcon = Icons.hourglass_empty;
+          debugPrint(
+              'DashboardScreen: Video active and service ready, but camera not initialized');
+        } else if (!hasController) {
+          statusText = 'no_controller'.tr();
+          statusIcon = Icons.error_outline;
+          debugPrint(
+              'DashboardScreen: Video active and camera initialized, but no controller');
+        }
       }
 
-      debugPrint('Returning status container: $statusText');
+      debugPrint('DashboardScreen: Returning status container: $statusText');
       return Container(
         color: Colors.black,
         child: Center(
@@ -865,9 +880,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Use toolbar button to control camera',
-                style: TextStyle(
+              Text(
+                'use_toolbar_button'.tr(),
+                style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 12,
                 ),
